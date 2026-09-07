@@ -1,0 +1,286 @@
+import React, { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useRacha } from '@/context/RachaContext'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { formatCurrencyBRL, Racha } from '@/types/racha'
+import {
+  Sparkles,
+  Send,
+  Plus,
+  Users,
+  ArrowRight,
+  TrendingUp,
+  RotateCcw,
+  Layers,
+} from 'lucide-react'
+
+const SUGGESTIONS = [
+  {
+    label: 'República',
+    emoji: '🏠',
+    text: 'Somos 4 pessoas da república e precisamos dividir o aluguel e as contas de R$ 1.600.',
+  },
+  { label: 'Comida', emoji: '🍕', text: 'Pedimos uma pizza e lanches de R$ 150 para 5 amigos.' },
+  {
+    label: 'Viagem',
+    emoji: '✈️',
+    text: 'Somos 6 pessoas e precisamos dividir R$ 480 da viagem da turma.',
+  },
+  {
+    label: 'Faculdade',
+    emoji: '🎓',
+    text: 'Precisamos arrecadar R$ 360 para a confecção dos materiais da formatura entre 4 alunos.',
+  },
+  {
+    label: 'Evento',
+    emoji: '🎉',
+    text: 'Compramos ingressos e bebidas da festa de aniversário por R$ 600 para 6 pessoas.',
+  },
+  { label: 'Outro', emoji: '➕', text: '' },
+]
+
+export default function Dashboard() {
+  const navigate = useNavigate()
+  const { rachas, currentNickname } = useRacha()
+  const [inputText, setInputText] = useState('')
+
+  const handleSend = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    const trimmed = inputText.trim()
+    if (!trimmed) {
+      // Navigate to assistant anyway
+      navigate('/assistente')
+      return
+    }
+    // Navigate to assistant passing text via state
+    navigate('/assistente', { state: { initialPrompt: trimmed } })
+  }
+
+  const handleChipClick = (suggestion: (typeof SUGGESTIONS)[0]) => {
+    if (suggestion.label === 'Outro') {
+      setInputText('')
+      return
+    }
+    setInputText(suggestion.text)
+  }
+
+  // Demo racha (pinned at top)
+  const demoRacha = rachas.find((r) => r.id === 'demo' || r.isDemo)
+  // Non-demo rachas
+  const regularRachas = rachas.filter((r) => r.id !== 'demo' && !r.isDemo)
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-3 sm:py-6 space-y-6">
+      {/* 1. GREETING HEADER */}
+      <div className="space-y-1">
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
+          Olá{currentNickname ? `, ${currentNickname}` : ''}! 👋 O que vamos rachar hoje?
+        </h1>
+        <p className="text-xs sm:text-sm text-muted-foreground">
+          Descreva o que precisa dividir ou escolha uma sugestão rápida abaixo.
+        </p>
+      </div>
+
+      {/* 2. CHAT INPUT CARD (Primary interaction) */}
+      <div className="bg-white rounded-2xl border border-border shadow-elevation p-4 sm:p-5 transition-all">
+        <form onSubmit={handleSend} className="space-y-3">
+          <div className="relative">
+            <textarea
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSend()
+                }
+              }}
+              rows={3}
+              placeholder="Ex.: Somos 6 pessoas e precisamos dividir R$ 480 da viagem da turma."
+              className="w-full p-3.5 sm:p-4 text-sm sm:text-base rounded-xl bg-[#F7F7FB] border border-border focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#7B2FF7] transition-all resize-none text-foreground placeholder:text-muted-foreground/70"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <Link
+              to="/racha/novo"
+              className="text-xs font-semibold text-muted-foreground hover:text-[#7B2FF7] transition-colors flex items-center gap-1 py-1"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Criar manualmente
+            </Link>
+
+            <Button
+              type="submit"
+              className="h-10 px-5 bg-[#7B2FF7] hover:bg-[#6A23E0] text-white font-semibold rounded-xl shadow-md transition-all flex items-center gap-2"
+            >
+              <span>Enviar</span>
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+        </form>
+
+        {/* Suggestion Chips */}
+        <div className="pt-4 border-t border-border/80 mt-3">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block mb-2">
+            Sugestões rápidas
+          </span>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {SUGGESTIONS.map((sug) => (
+              <button
+                key={sug.label}
+                type="button"
+                onClick={() => handleChipClick(sug)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F7F7FB] hover:bg-purple-50 hover:text-[#7B2FF7] hover:border-purple-200 border border-border text-xs font-medium text-foreground shrink-0 transition-all active:scale-95"
+              >
+                <span>{sug.emoji}</span>
+                <span>{sug.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 3. PINNED DEMO RACHA BANNER */}
+      {demoRacha && (
+        <div className="bg-gradient-to-r from-purple-50 via-white to-amber-50/50 rounded-2xl border-2 border-purple-200 p-4 sm:p-5 shadow-subtle relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Badge className="bg-[#7B2FF7] text-white text-[11px] font-semibold hover:bg-[#7B2FF7]">
+                  Racha de Demonstração
+                </Badge>
+                <span className="text-xs text-muted-foreground">🎓 Faculdade</span>
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-foreground">{demoRacha.name}</h3>
+              <p className="text-xs text-muted-foreground">
+                Cenário pronto para você testar todo o fluxo do pitch sem precisar cadastrar nada.
+              </p>
+            </div>
+
+            <Button
+              asChild
+              className="bg-[#7B2FF7] hover:bg-[#6A23E0] text-white text-xs sm:text-sm font-semibold rounded-xl h-10 px-4 shrink-0 shadow-sm"
+            >
+              <Link to="/racha/demo" className="flex items-center gap-1.5">
+                <span>Ver demonstração</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* 4. MEUS RACHAS SECTION */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
+            Meus rachas
+          </h2>
+          <Link to="/rachas" className="text-xs font-semibold text-[#7B2FF7] hover:underline">
+            Ver todos ({rachas.length})
+          </Link>
+        </div>
+
+        {regularRachas.length === 0 && !demoRacha ? (
+          /* Empty state */
+          <div className="bg-white rounded-2xl border border-dashed border-border p-8 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-purple-50 text-[#7B2FF7] mx-auto flex items-center justify-center text-xl">
+              🎉
+            </div>
+            <h3 className="text-base font-bold text-foreground">
+              Nenhum racha ainda. Crie o primeiro!
+            </h3>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              Divida contas com amigos, repúblicas ou eventos de faculdade sem burocracia.
+            </p>
+            <Button
+              asChild
+              className="bg-[#7B2FF7] hover:bg-[#6A23E0] text-white font-semibold rounded-xl text-xs h-10"
+            >
+              <Link to="/assistente">Criar um racha</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {rachas.map((racha) => (
+              <RachaListItemCard key={racha.id} racha={racha} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function RachaListItemCard({ racha }: { racha: Racha }) {
+  const total = racha.totalAmount
+  const paidAmount = racha.participants
+    .filter((p) => p.paid)
+    .reduce((acc, curr) => acc + curr.amount, 0)
+  const percent = total > 0 ? Math.min(100, Math.round((paidAmount / total) * 100)) : 0
+
+  const getEmoji = (cat: string) => {
+    switch (cat) {
+      case 'República':
+        return '🏠'
+      case 'Comida':
+        return '🍕'
+      case 'Viagem':
+        return '✈️'
+      case 'Faculdade':
+        return '🎓'
+      case 'Evento':
+        return '🎉'
+      default:
+        return '➕'
+    }
+  }
+
+  return (
+    <Link
+      to={racha.isDemo || racha.id === 'demo' ? '/racha/demo' : `/racha/${racha.id}`}
+      className="block bg-white rounded-2xl border border-border shadow-subtle p-4 hover:shadow-elevation hover:border-[#7B2FF7]/40 transition-all group"
+    >
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">{getEmoji(racha.category)}</span>
+          <div>
+            <h3 className="text-sm sm:text-base font-bold text-foreground group-hover:text-[#7B2FF7] transition-colors line-clamp-1">
+              {racha.name}
+            </h3>
+            <span className="text-[11px] text-muted-foreground font-medium">
+              {racha.category} • {racha.participants.length} participantes
+            </span>
+          </div>
+        </div>
+
+        {racha.isDemo && (
+          <Badge
+            variant="outline"
+            className="border-amber-400 text-amber-700 bg-amber-50 text-[10px] shrink-0"
+          >
+            Demo
+          </Badge>
+        )}
+      </div>
+
+      {/* Progress Bar */}
+      <div className="space-y-1.5 mt-3">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-semibold text-foreground tabular-nums">
+            {formatCurrencyBRL(paidAmount)} de {formatCurrencyBRL(total)}
+          </span>
+          <span className="text-[11px] font-bold text-muted-foreground">{percent}%</span>
+        </div>
+
+        <div className="w-full h-2 rounded-full bg-[#F7F7FB] overflow-hidden">
+          <div
+            className="h-full bg-[#7B2FF7] rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      </div>
+    </Link>
+  )
+}
