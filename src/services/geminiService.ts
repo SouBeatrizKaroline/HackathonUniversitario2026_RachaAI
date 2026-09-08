@@ -33,6 +33,18 @@ export interface MonthlySummaryData {
   source: 'gemini_api' | 'gemini_gateway' | 'client_fallback'
 }
 
+export interface CarteiraSummaryResult {
+  text: string
+  highlight?: string
+  metrics?: {
+    balance: number
+    totalDeposits: number
+    totalWithdrawals: number
+    pendingCount: number
+  }
+  source: 'gemini_api' | 'gemini_gateway' | 'client_fallback'
+}
+
 /**
  * Gera resumo mensal da república com Gemini (total pago, pendente e quem mais atrasa)
  * com fallback local heurístico garantido (nunca quebra).
@@ -282,6 +294,184 @@ export async function askGeminiAboutRacha(query: string, racha: Racha): Promise<
   return {
     text: botResponse,
     action: actionObj,
+    source: 'client_fallback',
+  }
+}
+
+/**
+ * Gera resumo financeiro ou responde dúvidas sobre o caixa compartilhado (Carteira).
+ * Chama o backend com Gemini real ou Skip AI Gateway.
+ * Se indisponível, gera resposta automática local determinística e transparente.
+ * Regra: NUNCA executa transações nem altera saldo.
+ */
+export async function askGeminiAboutCarteira(
+  query: string,
+  carteira: {
+    name: string
+    description?: string
+    balance: number
+    threshold: number
+    members: { name: string; role?: string; totalContributed: number }[]
+    movements: {
+      type: 'deposito' | 'saida'
+      amount: number
+      description: string
+      authorName: string
+    }[]
+    proposals: {
+      title: string
+      amount: number
+      proposerName: string
+      status: string
+      requiredApprovals: number
+      currentApprovals: number
+    }[]
+  },
+): Promise<CarteiraSummaryResult> {
+  const formatBrl = (val: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+
+  const deposits = carteira.movements.filter((m) => m.type === 'deposito')
+  const withdrawals = carteira.movements.filter((m) => m.type === 'saida')
+  const totalDeposits = deposits.reduce((acc, curr) => acc + curr.amount, 0)
+  const totalWithdrawals = withdrawals.reduce((acc, curr) => acc + curr.amount, 0)
+  const pendingProposals = carteira.proposals.filter((p) => p.status === 'pendente')
+
+  // Sorted members by total contributed
+  const rankedMembers = [...carteira.members].sort(
+    (a, b) => b.totalContributed - a.totalContributed,
+  )
+
+  const carteiraContext = {
+    name: carteira.name,
+    description: carteira.description,
+    balance: carteira.balance,
+    threshold: carteira.threshold,
+    membersCount: carteira.members.length,
+    totalDeposits,
+    totalWithdrawals,
+    members: rankedMembers.map((m) => ({
+      name: m.name,
+      role: m.role || 'membro',
+      totalContributed: m.totalContributed,
+    })),
+    recentMovements: carteira.movements.slice(0, 8),
+    pendingProposals: pendingProposals.map((p) => ({
+      title: p.title,
+      amount: p.amount,
+      proposer: p.proposerName,
+      needed: Math.max(0, p.requiredApprovals - p.currentApprovals),
+    })),
+  }
+
+  // 1. Tentar backend hook
+  try {
+    const res = await pb.send<any>('/backend/v1/gemini/carteira-summary', {
+      method: 'POST',
+      body: JSON.stringify({ query, carteiraContext }),
+    })
+
+    if (res && !res.useClientFallback && res.text) {
+      return {
+        text: res.text,
+        highlight: res.highlight,
+        metrics: res.metrics || {
+          balance: carteira.balance,
+          totalDeposits,
+          totalWithdrawals,
+          pendingCount: pendingProposals.length,
+        },
+        source: res.source || 'gemini_gateway',
+      }
+    }
+  } catch (err) {
+    console.warn(
+      'Endpoint Gemini de carteira indisponível no backend, usando resumo calculado local:',
+      err,
+    )
+  }
+
+  // 2. Fallback calculado localmente com regras sólidas (mesmas métricas)
+  const topContributorsStr = rankedMembers
+    .slice(0, 3)
+    .map((m) => `${m.name} (${formatBrl(m.totalContributed)})`)
+    .join(', ')
+
+  let fallbackText = ''
+  let fallbackHighlight = ''
+
+  const lower = (query || '').toLowerCase()
+
+  if (lower.includes('saldo') || lower.includes('quanto tem') || lower.includes('dinheiro')) {
+    fallbackText =
+      `💰 **Saldo do Caixa**: ${formatBrl(carteira.balance)} disponíveis.\n\n` +
+      `• Total já arrecadado no fundo: ${formatBrl(totalDeposits)}\n` +
+      `• Total pago em despesas coletivas: ${formatBrl(totalWithdrawals)}\n` +
+      `• Propostas pendentes de aprovação: ${pendingProposals.length}\n\n` +
+      `O caixa está positivo e pronto para despesas operacionais da casa.`
+    fallbackHighlight = `Saldo atual: ${formatBrl(carteira.balance)} disponível.`
+  } else if (
+    lower.includes('proposta') ||
+    lower.includes('aprova') ||
+    lower.includes('saída') ||
+    lower.includes('pendente')
+  ) {
+    if (pendingProposals.length === 0) {
+      fallbackText = `🗳️ **Votações do Caixa**:\n\nNenhuma proposta de saída pendente no momento! Todos os gastos propostos anteriormente foram concluídos ou não há novas solicitações em aberto.`
+      fallbackHighlight = `Tudo em dia! 0 propostas pendentes no caixa.`
+    } else {
+      const propDetails = pendingProposals
+        .map(
+          (p) =>
+            `• **${p.title}** (${formatBrl(p.amount)}) — proposto por ${p.proposerName}. Faltam ${Math.max(0, p.requiredApprovals - p.currentApprovals)} voto(s) para atingir o quórum de ${p.requiredApprovals}.`,
+        )
+        .join('\n')
+      fallbackText = `🗳️ **Propostas em Votação** (${pendingProposals.length}):\n\n${propDetails}\n\nLembre os demais moradores de registrar o voto na aba de propostas!`
+      fallbackHighlight = `${pendingProposals.length} proposta(s) aguardando atingir o quórum de ${carteira.threshold} votos.`
+    }
+  } else if (
+    lower.includes('ranking') ||
+    lower.includes('quem mais') ||
+    lower.includes('contribuiu') ||
+    lower.includes('cotista')
+  ) {
+    const listStr = rankedMembers
+      .map(
+        (m, idx) =>
+          `${idx + 1}º ${m.name}: ${formatBrl(m.totalContributed)} (${m.role === 'admin' ? 'Admin' : 'Morador'})`,
+      )
+      .join('\n')
+    fallbackText = `🏆 **Ranking de Contribuição dos Moradores**:\n\n${listStr}\n\nTotal acumulado de depósitos: ${formatBrl(totalDeposits)}.`
+    fallbackHighlight = `Maior contribuidor: ${rankedMembers[0]?.name || 'Nenhum'} (${formatBrl(rankedMembers[0]?.totalContributed || 0)}).`
+  } else {
+    // Resumo geral completo
+    const pendingSummary =
+      pendingProposals.length > 0
+        ? `⚠️ Há **${pendingProposals.length} proposta(s) de saída aguardando aprovação** (quórum exigido: ${carteira.threshold} moradores).`
+        : `✨ Nenhuma despesa pendente de aprovação.`
+
+    fallbackText =
+      `🏠 **Resumo Financeiro do Caixa Coletivo**\n\n` +
+      `• **Saldo Disponível**: ${formatBrl(carteira.balance)}\n` +
+      `• **Arrecadação Total**: ${formatBrl(totalDeposits)} em ${deposits.length} depósitos\n` +
+      `• **Saídas Aprovadas**: ${formatBrl(totalWithdrawals)} em ${withdrawals.length} despesas\n` +
+      `• **Top Contribuidores**: ${topContributorsStr || 'Nenhum morador registrado'}\n` +
+      `• **Regra de Governança**: Mínimo de **${carteira.threshold} aprovações** para liberação de qualquer débito\n\n` +
+      `${pendingSummary}\n\n` +
+      `*Aviso: Este resumo é gerado para leitura e planejamento da casa; a inteligência não efetua pagamentos nem altera saldos.*`
+
+    fallbackHighlight = `Caixa com saldo de ${formatBrl(carteira.balance)} • ${pendingProposals.length} proposta(s) pendente(s)`
+  }
+
+  return {
+    text: fallbackText,
+    highlight: fallbackHighlight,
+    metrics: {
+      balance: carteira.balance,
+      totalDeposits,
+      totalWithdrawals,
+      pendingCount: pendingProposals.length,
+    },
     source: 'client_fallback',
   }
 }

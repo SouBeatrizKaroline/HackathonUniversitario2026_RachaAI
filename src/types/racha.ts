@@ -133,6 +133,12 @@ export interface CarteiraProposta {
   createdAt: string
 }
 
+export interface CarteiraNotifPreferences {
+  novaProposta: boolean // Notificar quando nova proposta for criada
+  propostaAprovada: boolean // Notificar quando proposta atingir quórum e for aprovada
+  contribuicoes: boolean // Notificar quando morador fizer depósito/contribuição
+}
+
 export interface CarteiraCompartilhada {
   id: string
   name: string
@@ -146,6 +152,7 @@ export interface CarteiraCompartilhada {
   movements: CarteiraMovimento[]
   proposals: CarteiraProposta[]
   createdAt: string
+  notifPreferences?: Record<string, CarteiraNotifPreferences>
 }
 
 // -------------------------------------------------------------

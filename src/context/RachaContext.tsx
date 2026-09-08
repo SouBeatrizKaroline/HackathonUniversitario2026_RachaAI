@@ -22,6 +22,7 @@ import {
   CarteiraProposta,
   CarteiraMovimento,
   FinancialSummaryAggregated,
+  CarteiraNotifPreferences,
 } from '@/types/racha'
 import {
   fetchAllCarteiras,
@@ -106,6 +107,13 @@ interface RachaContextType {
     proposalId: string,
     approverName?: string,
   ) => Promise<{ executed: boolean }>
+  updateCarteiraQuorum: (carteiraId: string, newThreshold: number) => Promise<void>
+  updateMemberNotifPreferences: (
+    carteiraId: string,
+    memberKey: string,
+    preferences: CarteiraNotifPreferences,
+  ) => Promise<void>
+  getMemberNotifPreferences: (carteiraId: string, memberKey: string) => CarteiraNotifPreferences
   // Histórico financeiro
   financialSummary: FinancialSummaryAggregated
 }
@@ -1330,6 +1338,84 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [carteiras, currentNickname, addAppNotification],
   )
 
+  const updateCarteiraQuorum = useCallback(
+    async (carteiraId: string, newThreshold: number) => {
+      const target = carteiras.find(
+        (c) => c.id === carteiraId || (carteiraId === 'demo' && c.isDemo),
+      )
+      const targetId = target?.id || carteiraId
+      const memberCount = target?.members.length || 4
+
+      // Validação estrita: mínimo 1, máximo número de membros
+      const clamped = Math.max(1, Math.min(newThreshold, memberCount))
+
+      setCarteiras((prev) =>
+        prev.map((c) => {
+          if (c.id !== targetId && !(targetId === 'demo' && c.isDemo)) return c
+          return {
+            ...c,
+            threshold: clamped,
+          }
+        }),
+      )
+
+      try {
+        if (target && !target.id.startsWith('demo-')) {
+          await updateCarteiraThreshold(target.id, clamped)
+        }
+      } catch (err) {
+        console.warn('Erro ao atualizar quórum da carteira no PocketBase:', err)
+        throw err
+      }
+    },
+    [carteiras],
+  )
+
+  const updateMemberNotifPreferences = useCallback(
+    async (carteiraId: string, memberKey: string, preferences: CarteiraNotifPreferences) => {
+      const target = carteiras.find(
+        (c) => c.id === carteiraId || (carteiraId === 'demo' && c.isDemo),
+      )
+      const targetId = target?.id || carteiraId
+
+      setCarteiras((prev) =>
+        prev.map((c) => {
+          if (c.id !== targetId && !(targetId === 'demo' && c.isDemo)) return c
+          const currentPrefs = c.notifPreferences || {}
+          return {
+            ...c,
+            notifPreferences: {
+              ...currentPrefs,
+              [memberKey]: preferences,
+            },
+          }
+        }),
+      )
+
+      try {
+        if (target && !target.id.startsWith('demo-')) {
+          await updateCarteiraMemberPreferences(target.id, memberKey, preferences)
+        }
+      } catch (err) {
+        console.warn('Erro ao persistir preferências no PocketBase:', err)
+      }
+    },
+    [carteiras],
+  )
+
+  const getMemberNotifPreferences = useCallback(
+    (carteiraId: string, memberKey: string): CarteiraNotifPreferences => {
+      const target = carteiras.find(
+        (c) => c.id === carteiraId || (carteiraId === 'demo' && c.isDemo),
+      )
+      if (!target || !target.notifPreferences) {
+        return DEFAULT_CARTEIRA_NOTIF_PREFS
+      }
+      return target.notifPreferences[memberKey] || DEFAULT_CARTEIRA_NOTIF_PREFS
+    },
+    [carteiras],
+  )
+
   // FINANCIAL SUMMARY
   const financialSummary = useMemo(() => {
     return computeFinancialSummary(rachas)
@@ -1369,6 +1455,9 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       contributeToCarteira,
       proposeCarteiraExpense,
       approveProposal,
+      updateCarteiraQuorum,
+      updateMemberNotifPreferences,
+      getMemberNotifPreferences,
       financialSummary,
     }),
     [
@@ -1404,6 +1493,9 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       contributeToCarteira,
       proposeCarteiraExpense,
       approveProposal,
+      updateCarteiraQuorum,
+      updateMemberNotifPreferences,
+      getMemberNotifPreferences,
       financialSummary,
     ],
   )

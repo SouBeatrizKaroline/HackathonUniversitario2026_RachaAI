@@ -1,18 +1,18 @@
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useRacha } from '@/context/RachaContext'
-import { useAuth } from '@/context/AuthContext'
 import {
   formatCurrencyBRL,
   parseCurrencyInput,
   CarteiraCompartilhada,
   CarteiraProposta,
-  CarteiraMovimento,
-  CarteiraMembro,
+  CarteiraNotifPreferences,
 } from '@/types/racha'
+import { useRacha } from '@/context/RachaContext'
+import { useAuth } from '@/context/AuthContext'
+import { askGeminiAboutCarteira, CarteiraSummaryResult } from '@/services/geminiService'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -31,14 +31,18 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Users,
-  AlertCircle,
   HelpCircle,
   Sparkles,
-  Lock,
-  ChevronRight,
-  Repeat,
-  DollarSign,
-  TrendingUp,
+  Bot,
+  Settings,
+  Bell,
+  SlidersHorizontal,
+  Info,
+  CornerDownLeft,
+  Loader2,
+  RefreshCw,
+  ShieldAlert,
+  AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -51,9 +55,14 @@ export default function CarteiraPage() {
     approveProposal,
     currentNickname,
     setIsWhySolanaModalOpen,
+    updateCarteiraQuorum,
+    updateMemberNotifPreferences,
+    getMemberNotifPreferences,
   } = useRacha()
 
-  const [activeTab, setActiveTab] = useState<'movimentos' | 'propostas' | 'membros'>('movimentos')
+  const [activeTab, setActiveTab] = useState<
+    'movimentos' | 'propostas' | 'membros' | 'configuracoes'
+  >('movimentos')
 
   // Modals state
   const [isContributeModalOpen, setIsContributeModalOpen] = useState(false)
@@ -74,9 +83,125 @@ export default function CarteiraPage() {
     ? user?.name || user?.email?.split('@')[0] || 'Usuário'
     : currentNickname || 'Você'
 
+  const currentMemberKey = isAuthenticated && user?.id ? user.id : currentActorName
+
   const carteira = primaryCarteira
 
-  // Handlers
+  // Permissão para alterar quórum:
+  // Dono da carteira (owner === user.id) ou no cenário Demo ou primeiro morador admin (ex: Lucas)
+  const isOwnerOrAdmin =
+    Boolean(carteira.isDemo) ||
+    !carteira.owner ||
+    (isAuthenticated && user?.id && carteira.owner === user.id) ||
+    carteira.members.some(
+      (m) =>
+        m.role === 'admin' && m.name.trim().toLowerCase() === currentActorName.trim().toLowerCase(),
+    )
+
+  // --------------------------------------------------------------------------
+  // 1. ESTADO E FUNÇÕES DO RESUMO DO CAIXA PELO GEMINI
+  // --------------------------------------------------------------------------
+  const [aiQuestion, setAiQuestion] = useState('')
+  const [isAskingAi, setIsAskingAi] = useState(false)
+  const [aiSummary, setAiSummary] = useState<CarteiraSummaryResult | null>(null)
+  const [isAiBoxExpanded, setIsAiBoxExpanded] = useState(true)
+
+  const handleAskCarteiraAi = async (customQuery?: string) => {
+    const query = (customQuery ?? aiQuestion).trim()
+    setIsAskingAi(true)
+
+    try {
+      const res = await askGeminiAboutCarteira(
+        query || 'Como está o caixa da república este mês? Faça um resumo completo.',
+        {
+          name: carteira.name,
+          description: carteira.description,
+          balance: carteira.balance,
+          threshold: carteira.threshold,
+          members: carteira.members.map((m) => ({
+            name: m.name,
+            role: m.role,
+            totalContributed: m.totalContributed,
+          })),
+          movements: carteira.movements.map((mov) => ({
+            type: mov.type,
+            amount: mov.amount,
+            description: mov.description,
+            authorName: mov.authorName,
+          })),
+          proposals: carteira.proposals.map((prop) => ({
+            title: prop.title,
+            amount: prop.amount,
+            proposerName: prop.proposerName,
+            status: prop.status,
+            requiredApprovals: prop.requiredApprovals,
+            currentApprovals: prop.currentApprovals,
+          })),
+        },
+      )
+
+      setAiSummary(res)
+      if (!customQuery) {
+        setAiQuestion('')
+      }
+      setIsAiBoxExpanded(true)
+    } catch (err) {
+      console.error('Erro ao pedir resumo ao Gemini:', err)
+      toast.error('Não foi possível gerar o resumo da carteira no momento.')
+    } finally {
+      setIsAskingAi(false)
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 2. CONFIGURAÇÕES DA CARTEIRA: QUÓRUM E NOTIFICAÇÕES
+  // --------------------------------------------------------------------------
+  const [quorumInput, setQuorumInput] = useState<number>(carteira.threshold || 2)
+  const [isSavingQuorum, setIsSavingQuorum] = useState(false)
+
+  // Notificações locais do morador ativo
+  const activePrefs: CarteiraNotifPreferences = getMemberNotifPreferences(
+    carteira.id,
+    currentMemberKey,
+  )
+
+  const handleTogglePreference = async (
+    field: keyof CarteiraNotifPreferences,
+    checked: boolean,
+  ) => {
+    const nextPrefs: CarteiraNotifPreferences = {
+      ...activePrefs,
+      [field]: checked,
+    }
+    await updateMemberNotifPreferences(carteira.id, currentMemberKey, nextPrefs)
+    toast.success('Preferência de notificação atualizada!')
+  }
+
+  const handleSaveQuorum = async () => {
+    const memberCount = Math.max(1, carteira.members.length)
+    if (quorumInput < 1) {
+      toast.error('O quórum mínimo é de 1 aprovação.')
+      return
+    }
+    if (quorumInput > memberCount) {
+      toast.error(`O quórum não pode ser maior que o número de membros (${memberCount}).`)
+      return
+    }
+
+    setIsSavingQuorum(true)
+    try {
+      await updateCarteiraQuorum(carteira.id, quorumInput)
+      toast.success(`Quórum atualizado com sucesso para ${quorumInput} aprovações! 🛡️`)
+    } catch {
+      toast.error('Erro ao salvar nova regra de quórum.')
+    } finally {
+      setIsSavingQuorum(false)
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // HANDLERS DE DEPÓSITO E PROPOSTA
+  // --------------------------------------------------------------------------
   const handleOpenContribute = () => {
     setContributeAmountStr('')
     setContributeDesc('')
@@ -170,7 +295,6 @@ export default function CarteiraPage() {
   }
 
   const pendingProposals = carteira.proposals.filter((p) => p.status === 'pendente')
-  const completedProposals = carteira.proposals.filter((p) => p.status !== 'pendente')
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-3 sm:py-6 space-y-6">
@@ -286,6 +410,175 @@ export default function CarteiraPage() {
         </div>
       </div>
 
+      {/* 2.2 ASSISTENTE IA: RESUMO DO CAIXA PELO GEMINI */}
+      <div className="bg-white rounded-3xl border border-purple-200 shadow-subtle p-4 sm:p-5 space-y-4">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-purple-100 text-[#7B2FF7] flex items-center justify-center font-bold">
+              <Bot className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-bold text-foreground">
+                  Resumo do Caixa por Inteligência Artificial
+                </h2>
+                {aiSummary ? (
+                  aiSummary.source === 'client_fallback' ? (
+                    <Badge
+                      variant="secondary"
+                      className="bg-slate-100 text-slate-700 text-[10px] font-semibold"
+                    >
+                      Resumo automático
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[10px] font-bold gap-1 shadow-xs">
+                      <Sparkles className="w-3 h-3" />
+                      Gemini
+                    </Badge>
+                  )
+                ) : (
+                  <Badge
+                    variant="outline"
+                    className="border-purple-300 text-[#7B2FF7] text-[10px] font-semibold"
+                  >
+                    Leitura & Análise
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Pergunte em linguagem natural sobre o saldo, contribuições ou saúde do caixa
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isAskingAi}
+              onClick={() =>
+                handleAskCarteiraAi(
+                  'Faça um resumo financeiro completo do caixa da república este mês.',
+                )
+              }
+              className="h-8 text-xs font-semibold rounded-xl gap-1.5 border-purple-200 text-[#7B2FF7] hover:bg-purple-50"
+            >
+              {isAskingAi ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5" />
+              )}
+              <span>{aiSummary ? 'Atualizar Resumo' : 'Pedir Resumo Geral'}</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Input para perguntas personalizadas */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleAskCarteiraAi()
+          }}
+          className="flex flex-col sm:flex-row gap-2"
+        >
+          <div className="relative flex-1">
+            <Input
+              type="text"
+              placeholder="Ex.: Como está o caixa este mês? Quem mais contribuiu? Quanto falta aprovar?"
+              value={aiQuestion}
+              onChange={(e) => setAiQuestion(e.target.value)}
+              className="h-11 rounded-2xl pr-10 text-xs sm:text-sm border-purple-200 focus-visible:ring-[#7B2FF7]"
+            />
+            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs pointer-events-none hidden sm:inline">
+              ↵ Enter
+            </span>
+          </div>
+
+          <Button
+            type="submit"
+            disabled={isAskingAi}
+            className="bg-[#7B2FF7] hover:bg-[#6A23E0] text-white font-bold text-xs rounded-2xl h-11 px-5 shrink-0 gap-2"
+          >
+            {isAskingAi ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Analisando caixa...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                <span>Perguntar</span>
+              </>
+            )}
+          </Button>
+        </form>
+
+        {/* Chips de perguntas sugeridas */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+          <span className="text-[11px] font-semibold text-muted-foreground shrink-0">
+            Sugestões:
+          </span>
+          {[
+            'Como está o caixa da república este mês?',
+            'Quem mais contribuiu no caixa?',
+            'Quais propostas aguardam aprovação?',
+            'Quanto tem de saldo livre?',
+          ].map((sug) => (
+            <button
+              key={sug}
+              type="button"
+              onClick={() => handleAskCarteiraAi(sug)}
+              className="px-2.5 py-1 rounded-full bg-purple-50 hover:bg-purple-100 text-[#7B2FF7] text-[11px] font-medium shrink-0 transition-colors border border-purple-100"
+            >
+              {sug}
+            </button>
+          ))}
+        </div>
+
+        {/* Resposta do Gemini ou Fallback */}
+        {aiSummary && isAiBoxExpanded && (
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#FAF7FD] to-[#F3EEFF] border border-purple-200 p-4 sm:p-5 space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span className="text-xs font-bold uppercase tracking-wider text-[#7B2FF7]">
+                  {aiSummary.source === 'client_fallback'
+                    ? 'Resumo Automático do Caixa'
+                    : 'Análise Gemini'}
+                </span>
+                {aiSummary.source !== 'client_fallback' && (
+                  <Badge className="bg-purple-600 text-white text-[10px] font-bold">IA Real</Badge>
+                )}
+              </div>
+
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Somente leitura — não altera dados</span>
+              </span>
+            </div>
+
+            {aiSummary.highlight && (
+              <div className="bg-white/80 backdrop-blur-xs rounded-xl p-3 border border-purple-100 text-xs sm:text-sm font-semibold text-purple-950 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#7B2FF7] shrink-0" />
+                <span>{aiSummary.highlight}</span>
+              </div>
+            )}
+
+            <div className="text-xs sm:text-sm text-foreground/90 whitespace-pre-line leading-relaxed space-y-2">
+              {aiSummary.text}
+            </div>
+
+            {/* Aviso de produto */}
+            <div className="pt-2 border-t border-purple-200/60 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1 italic">
+                <Info className="w-3.5 h-3.5 text-purple-500" />
+                O assistente lê métricas consolidadas e nunca movimenta valores sozinho.
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* 2.5 AVISO PENDÊNCIAS DE APROVAÇÃO (Destaque se houver propostas pendentes) */}
       {pendingProposals.length > 0 && (
         <div className="bg-amber-50/90 border-2 border-amber-300/80 rounded-2xl p-4 sm:p-5 shadow-subtle space-y-3">
@@ -380,13 +673,13 @@ export default function CarteiraPage() {
         </div>
       )}
 
-      {/* 3. TABS: MOVIMENTAÇÕES, PROPOSTAS, MEMBROS */}
+      {/* 3. TABS: MOVIMENTAÇÕES, PROPOSTAS, MEMBROS, CONFIGURAÇÕES */}
       <div className="space-y-4">
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-1.5 border-b border-border pb-1">
+        <div className="flex items-center gap-1.5 border-b border-border pb-1 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab('movimentos')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-colors flex items-center gap-1.5 shrink-0 ${
               activeTab === 'movimentos'
                 ? 'bg-[#7B2FF7] text-white shadow-xs'
                 : 'text-muted-foreground hover:text-foreground hover:bg-slate-100'
@@ -398,7 +691,7 @@ export default function CarteiraPage() {
 
           <button
             onClick={() => setActiveTab('propostas')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-colors flex items-center gap-1.5 shrink-0 ${
               activeTab === 'propostas'
                 ? 'bg-[#7B2FF7] text-white shadow-xs'
                 : 'text-muted-foreground hover:text-foreground hover:bg-slate-100'
@@ -410,7 +703,7 @@ export default function CarteiraPage() {
 
           <button
             onClick={() => setActiveTab('membros')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-colors flex items-center gap-1.5 shrink-0 ${
               activeTab === 'membros'
                 ? 'bg-[#7B2FF7] text-white shadow-xs'
                 : 'text-muted-foreground hover:text-foreground hover:bg-slate-100'
@@ -418,6 +711,18 @@ export default function CarteiraPage() {
           >
             <Users className="w-4 h-4" />
             <span>Membros ({carteira.members.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('configuracoes')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-colors flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'configuracoes'
+                ? 'bg-[#7B2FF7] text-white shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-slate-100'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            <span>Configurações</span>
           </button>
         </div>
 
@@ -677,6 +982,225 @@ export default function CarteiraPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: CONFIGURAÇÕES DO GRUPO (CARTEIRA) */}
+        {activeTab === 'configuracoes' && (
+          <div className="space-y-5">
+            {/* 1. SEÇÃO DE QUÓRUM DE VOTAÇÃO (ADMIN / DONO) */}
+            <div className="bg-white rounded-2xl border border-border shadow-subtle p-4 sm:p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border/70">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-purple-100 text-[#7B2FF7]">
+                      <SlidersHorizontal className="w-4 h-4" />
+                    </span>
+                    <h3 className="text-base font-bold text-foreground">
+                      Quórum de Aprovação de Saídas
+                    </h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Define quantos moradores precisam aprovar uma proposta antes que o dinheiro seja
+                    debitado do caixa.
+                  </p>
+                </div>
+
+                {carteira.isDemo ? (
+                  <Badge
+                    variant="outline"
+                    className="border-amber-400 bg-amber-50 text-amber-800 text-[10px] font-bold self-start sm:self-center"
+                  >
+                    Cenário Demo (Aloprados: 2 de 4)
+                  </Badge>
+                ) : isOwnerOrAdmin ? (
+                  <Badge className="bg-emerald-100 text-emerald-800 text-[10px] font-bold self-start sm:self-center">
+                    Permissão de Dono/Admin
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-[10px] self-start sm:self-center">
+                    Apenas leitura
+                  </Badge>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Current Quorum Explanatory Box */}
+                  <div className="p-4 rounded-xl bg-purple-50/60 border border-purple-100 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-purple-900 uppercase tracking-wider">
+                        Regra Atual
+                      </span>
+                      <span className="text-sm font-extrabold text-[#7B2FF7]">
+                        {carteira.threshold} de {carteira.members.length} moradores
+                      </span>
+                    </div>
+                    <p className="text-xs text-purple-950/80 leading-relaxed">
+                      Qualquer saída proposta necessita de pelo menos{' '}
+                      <strong>{carteira.threshold} aprovações</strong> de moradores distintos para
+                      ter execução automática.
+                    </p>
+                  </div>
+
+                  {/* Quorum Form */}
+                  <div className="p-4 rounded-xl border border-border bg-[#F7F7FB] space-y-3">
+                    <label className="text-xs font-bold text-foreground block">
+                      Ajustar quórum necessário
+                    </label>
+
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={Math.max(1, carteira.members.length)}
+                        value={quorumInput}
+                        disabled={!isOwnerOrAdmin || isSavingQuorum}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10)
+                          if (!isNaN(val)) {
+                            setQuorumInput(val)
+                          }
+                        }}
+                        className="w-24 h-10 text-base font-bold text-center rounded-xl bg-white"
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        de <strong>{carteira.members.length}</strong> membros totais da república
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[11px] text-muted-foreground">
+                        Mínimo: 1 • Máximo: {carteira.members.length}
+                      </span>
+                      {isOwnerOrAdmin && (
+                        <Button
+                          size="sm"
+                          disabled={isSavingQuorum || quorumInput === carteira.threshold}
+                          onClick={handleSaveQuorum}
+                          className="bg-[#7B2FF7] hover:bg-[#6A23E0] text-white text-xs font-semibold rounded-xl h-8 px-3"
+                        >
+                          {isSavingQuorum ? 'Salvando...' : 'Salvar Quórum'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {!isOwnerOrAdmin && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2.5 rounded-xl flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>
+                      Apenas o criador/dono ou administrador da carteira tem permissão para alterar
+                      a regra de quórum do grupo.
+                    </span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* 2. SEÇÃO DE PREFERÊNCIAS DE AVISO / NOTIFICAÇÃO (POR MORADOR) */}
+            <div className="bg-white rounded-2xl border border-border shadow-subtle p-4 sm:p-6 space-y-4">
+              <div className="space-y-1 pb-3 border-b border-border/70">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-blue-100 text-blue-700">
+                    <Bell className="w-4 h-4" />
+                  </span>
+                  <h3 className="text-base font-bold text-foreground">
+                    Minhas Preferências de Notificação
+                  </h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Personalize quais alertas você (<strong>{currentActorName}</strong>) deseja
+                  receber no sininho de notificações deste dispositivo.
+                </p>
+              </div>
+
+              <div className="divide-y divide-border/60">
+                {/* 1. Nova proposta */}
+                <div className="py-3.5 flex items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-bold text-foreground">
+                      Nova proposta de saída criada
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Receber aviso quando outro morador solicitar dinheiro do caixa para uma compra
+                      ou reparo.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={activePrefs.novaProposta !== false}
+                    onCheckedChange={(checked) => handleTogglePreference('novaProposta', checked)}
+                  />
+                </div>
+
+                {/* 2. Proposta aprovada */}
+                <div className="py-3.5 flex items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-bold text-foreground">
+                      Proposta aprovada e liquidada
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Ser notificado quando uma proposta atingir o quórum necessário e o débito for
+                      executado no saldo.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={activePrefs.propostaAprovada !== false}
+                    onCheckedChange={(checked) =>
+                      handleTogglePreference('propostaAprovada', checked)
+                    }
+                  />
+                </div>
+
+                {/* 3. Contribuições e depósitos */}
+                <div className="py-3.5 flex items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-bold text-foreground">
+                      Novos depósitos e contribuições
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Receber alerta quando qualquer morador colocar dinheiro no fundo de reserva da
+                      casa.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={activePrefs.contribuicoes !== false}
+                    onCheckedChange={(checked) => handleTogglePreference('contribuicoes', checked)}
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-[#F7F7FB] rounded-xl text-xs text-muted-foreground flex items-center gap-2">
+                <Info className="w-4 h-4 text-[#7B2FF7] shrink-0" />
+                <span>
+                  As preferências são individuais: desativar um aviso afeta apenas os seus alertas,
+                  mantendo a rotina dos outros moradores intacta.
+                </span>
+              </div>
+            </div>
+
+            {/* 3. DADOS DE IDENTIFICAÇÃO DO GRUPO */}
+            <div className="bg-white rounded-2xl border border-border shadow-subtle p-4 sm:p-5 space-y-2 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between">
+                <span>Código da carteira:</span>
+                <span className="font-mono font-bold text-foreground">
+                  {carteira.groupCode || carteira.id}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Total de moradores ativos:</span>
+                <span className="font-bold text-foreground">
+                  {carteira.members.length} moradores
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Modo de execução:</span>
+                <span className="font-bold text-purple-700">
+                  Multisig simulado com governança coletiva
+                </span>
+              </div>
             </div>
           </div>
         )}
