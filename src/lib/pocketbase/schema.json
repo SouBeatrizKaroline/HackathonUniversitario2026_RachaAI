@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-07T23:50:35.741Z",
+  "generatedAt": "2026-09-08T00:07:25.651Z",
   "collections": [
     {
       "name": "users",
@@ -42,6 +42,221 @@
       "indexes": [
         "CREATE UNIQUE INDEX `idx_tokenKey__pb_users_auth_` ON `users` (`tokenKey`)",
         "CREATE UNIQUE INDEX `idx_email__pb_users_auth_` ON `users` (`email`) WHERE `email` != ''"
+      ]
+    },
+    {
+      "name": "rachas",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "category",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["República", "Comida", "Viagem", "Faculdade", "Evento", "Outro"]
+        },
+        {
+          "name": "totalAmount",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "splitType",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["equal", "custom"]
+        },
+        {
+          "name": "shareCode",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "isDemo",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "solanaRecipient",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_rachas_shareCode ON rachas (shareCode)",
+        "CREATE INDEX idx_rachas_created ON rachas (created DESC)"
+      ]
+    },
+    {
+      "name": "participantes",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "racha",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "rachas"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "amount",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "paid",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "paidAt",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "txHash",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_participantes_racha ON participantes (racha)"]
+    },
+    {
+      "name": "pagamentos",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "racha",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "rachas"
+        },
+        {
+          "name": "participantName",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "amount",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["Confirmado", "Pendente"]
+        },
+        {
+          "name": "txHash",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "timestamp",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_pagamentos_racha ON pagamentos (racha)",
+        "CREATE INDEX idx_pagamentos_created ON pagamentos (created DESC)"
       ]
     }
   ]

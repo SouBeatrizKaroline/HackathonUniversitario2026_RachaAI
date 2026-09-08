@@ -29,16 +29,17 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 }) => {
   const [copied, setCopied] = useState(false)
 
-  const fakeLink = `racha.ai/r/${shareCode || 'viagem-congresso-7k2m'}`
+  // Real URL linking directly to the live racha route
+  const realUrl = `${window.location.origin}/racha/${shareCode || 'viagem-congresso-7k2m'}`
 
-  const suggestedMessage = `🎓 Racha do(a) ${rachaName}\n\nSua parte: ${formatCurrencyBRL(
+  const suggestedMessage = `🎓 Racha: ${rachaName}\n\nSua parte: ${formatCurrencyBRL(
     perPersonAmount,
-  )}\n\nAcompanhe e pague pelo Racha.AI:\nhttps://${fakeLink}`
+  )}\n\nAcompanhe e pague pelo Racha.AI:\n${realUrl}`
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(`https://${fakeLink}`)
+    navigator.clipboard.writeText(realUrl)
     setCopied(true)
-    toast.success('Link copiado! ✅')
+    toast.success('Link de convite copiado! ✅')
     setTimeout(() => setCopied(false), 2500)
   }
 
@@ -49,7 +50,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
   const handleShareTelegram = () => {
     const url = `https://t.me/share/url?url=${encodeURIComponent(
-      `https://${fakeLink}`,
+      realUrl,
     )}&text=${encodeURIComponent(`🎓 Racha: ${rachaName} - Sua parte: ${formatCurrencyBRL(perPersonAmount)}`)}`
     window.open(url, '_blank')
   }
@@ -82,8 +83,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             <div className="flex items-center gap-2">
               <Input
                 readOnly
-                value={fakeLink}
-                className="h-10 text-xs sm:text-sm font-mono bg-[#F7F7FB] border-border text-foreground"
+                value={realUrl}
+                className="h-10 text-xs sm:text-sm font-mono bg-[#F7F7FB] border-border text-foreground truncate"
               />
               <Button
                 type="button"

@@ -178,26 +178,36 @@ export default function CreateRachaPage() {
   const isFormValid =
     name.trim().length > 0 && totalAmount > 0 && participants.length > 0 && isSumValid
 
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   // Submit
-  const handleConfirmRacha = (e: React.FormEvent) => {
+  const handleConfirmRacha = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!isFormValid) return
+    if (!isFormValid || isSubmitting) return
 
-    const newRacha = createRacha({
-      name: name.trim(),
-      category,
-      totalAmount,
-      splitType: splitMode,
-      participants: participants.map((p) => ({
-        id: p.id,
-        name: p.name.trim() || 'Sem nome',
-        amount: p.amount,
-        paid: p.paid,
-      })),
-    })
+    setIsSubmitting(true)
+    try {
+      const newRacha = await createRacha({
+        name: name.trim(),
+        category,
+        totalAmount,
+        splitType: splitMode,
+        participants: participants.map((p) => ({
+          id: p.id,
+          name: p.name.trim() || 'Sem nome',
+          amount: p.amount,
+          paid: p.paid,
+        })),
+      })
 
-    toast.success('Racha criado com sucesso! 🎉')
-    navigate(`/racha/${newRacha.id}`, { state: { justCreated: true } })
+      toast.success('Racha criado com sucesso! 🎉')
+      navigate(`/racha/${newRacha.id}`, { state: { justCreated: true } })
+    } catch (err) {
+      console.error('Erro ao criar racha:', err)
+      toast.error('Erro ao salvar racha. Tente novamente.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -422,11 +432,11 @@ export default function CreateRachaPage() {
         <div className="pt-2">
           <Button
             type="submit"
-            disabled={!isFormValid}
+            disabled={!isFormValid || isSubmitting}
             className="w-full h-12 bg-[#7B2FF7] hover:bg-[#6A23E0] text-white text-base font-bold rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="w-5 h-5" />
-            Confirmar racha
+            {isSubmitting ? 'Salvando no banco de dados...' : 'Confirmar racha'}
           </Button>
         </div>
       </form>

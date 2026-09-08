@@ -3,7 +3,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyBRL, generateTxHash } from '@/types/racha'
-import { Check, Copy, ExternalLink, ShieldAlert, Sparkles, Loader2, ArrowRight } from 'lucide-react'
+import { DEFAULT_SOLANA_WALLET, buildSolanaPayUrl } from '@/lib/solanaPay'
+import {
+  Check,
+  Copy,
+  ShieldAlert,
+  Sparkles,
+  Loader2,
+  ArrowRight,
+  QrCode,
+  Wallet,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 interface SolanaPaymentModalProps {
@@ -12,6 +22,7 @@ interface SolanaPaymentModalProps {
   amount: number
   participantName: string
   rachaName: string
+  solanaRecipient?: string
   onPaymentSuccess: (txHash: string) => void
 }
 
@@ -21,12 +32,41 @@ export const SolanaPaymentModal: React.FC<SolanaPaymentModalProps> = ({
   amount,
   participantName,
   rachaName,
+  solanaRecipient,
   onPaymentSuccess,
 }) => {
   const [status, setStatus] = useState<'idle' | 'processing' | 'success'>('idle')
   const [showTxDetails, setShowTxDetails] = useState(false)
   const [txHash, setTxHash] = useState<string>('')
   const [fakeTimestamp, setFakeTimestamp] = useState<string>('')
+
+  // Determine if there is a real Solana wallet configured
+  const effectiveRecipient = solanaRecipient || DEFAULT_SOLANA_WALLET
+  const hasRealSolanaWallet = Boolean(effectiveRecipient && effectiveRecipient.trim().length > 20)
+
+  // Standard Solana Pay URL (solana:<recipient>?amount=...&spl-token=...)
+  const solanaPayUrl = hasRealSolanaWallet
+    ? buildSolanaPayUrl({
+        recipient: effectiveRecipient,
+        amountInBrl: amount,
+        label: `Racha.AI - ${rachaName}`,
+        message: `Pagamento de ${participantName}`,
+        memo: `rachaai_${participantName.toLowerCase().replace(/\s+/g, '_')}`,
+      })
+    : ''
+
+  const qrImageUrl = solanaPayUrl
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+        solanaPayUrl,
+      )}&margin=1`
+    : ''
+
+  const handleCopySolanaPayUrl = () => {
+    if (solanaPayUrl) {
+      navigator.clipboard.writeText(solanaPayUrl)
+      toast.success('Link Solana Pay copiado!')
+    }
+  }
 
   const handleSimulatePayment = () => {
     setStatus('processing')
@@ -83,12 +123,22 @@ export const SolanaPaymentModal: React.FC<SolanaPaymentModalProps> = ({
                 <span className="text-xs uppercase tracking-wider font-semibold text-muted-foreground">
                   Pagamento Coletivo
                 </span>
-                <Badge
-                  variant="outline"
-                  className="border-amber-400 text-amber-700 bg-amber-50 text-[11px] font-medium"
-                >
-                  Demonstração
-                </Badge>
+                {hasRealSolanaWallet ? (
+                  <Badge
+                    variant="outline"
+                    className="border-purple-400 text-[#7B2FF7] bg-purple-50 text-[11px] font-medium flex items-center gap-1"
+                  >
+                    <Wallet className="w-3 h-3" />
+                    Solana Pay Real
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant="outline"
+                    className="border-amber-400 text-amber-700 bg-amber-50 text-[11px] font-medium"
+                  >
+                    Demonstração
+                  </Badge>
+                )}
               </div>
               <DialogTitle className="text-2xl font-bold tracking-tight text-foreground pt-1">
                 Pague {formatCurrencyBRL(amount)}
@@ -100,75 +150,90 @@ export const SolanaPaymentModal: React.FC<SolanaPaymentModalProps> = ({
             </DialogHeader>
 
             <div className="py-5 flex flex-col items-center">
-              {/* Demonstrable QR Code Card */}
+              {/* QR Code Container: Real Solana Pay ou Demonstrativo */}
               <div className="relative w-52 h-52 p-3 bg-white border-2 border-dashed border-[#7B2FF7]/40 rounded-2xl flex flex-col items-center justify-center shadow-subtle group hover:border-[#7B2FF7] transition-all">
-                {/* Simulated QR Code SVG pattern */}
-                <svg
-                  className="w-40 h-40"
-                  viewBox="0 0 140 140"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <rect width="140" height="140" rx="8" fill="#FBFBFF" />
-                  {/* Top-left position block */}
-                  <rect x="14" y="14" width="32" height="32" rx="4" fill="#7B2FF7" />
-                  <rect x="20" y="20" width="20" height="20" rx="2" fill="#FFFFFF" />
-                  <rect x="25" y="25" width="10" height="10" rx="1" fill="#7B2FF7" />
-
-                  {/* Top-right position block */}
-                  <rect x="94" y="14" width="32" height="32" rx="4" fill="#7B2FF7" />
-                  <rect x="100" y="20" width="20" height="20" rx="2" fill="#FFFFFF" />
-                  <rect x="105" y="25" width="10" height="10" rx="1" fill="#7B2FF7" />
-
-                  {/* Bottom-left position block */}
-                  <rect x="14" y="94" width="32" height="32" rx="4" fill="#7B2FF7" />
-                  <rect x="20" y="100" width="20" height="20" rx="2" fill="#FFFFFF" />
-                  <rect x="25" y="105" width="10" height="10" rx="1" fill="#7B2FF7" />
-
-                  {/* Simulated matrix pixels */}
-                  <rect x="54" y="18" width="6" height="6" fill="#1A1A2E" />
-                  <rect x="66" y="18" width="8" height="6" fill="#1A1A2E" />
-                  <rect x="78" y="18" width="6" height="6" fill="#1A1A2E" />
-                  <rect x="54" y="28" width="10" height="6" fill="#7B2FF7" />
-                  <rect x="70" y="28" width="14" height="6" fill="#1A1A2E" />
-                  <rect x="58" y="40" width="8" height="8" fill="#1A1A2E" />
-                  <rect x="74" y="40" width="6" height="8" fill="#7B2FF7" />
-                  <rect x="18" y="56" width="8" height="8" fill="#1A1A2E" />
-                  <rect x="32" y="56" width="6" height="6" fill="#7B2FF7" />
-                  <rect x="46" y="54" width="12" height="10" fill="#1A1A2E" />
-                  <rect x="66" y="56" width="10" height="6" fill="#1A1A2E" />
-                  <rect x="84" y="54" width="8" height="12" fill="#7B2FF7" />
-                  <rect x="100" y="58" width="12" height="6" fill="#1A1A2E" />
-                  <rect x="118" y="54" width="8" height="8" fill="#1A1A2E" />
-                  <rect x="56" y="72" width="14" height="6" fill="#1A1A2E" />
-                  <rect x="76" y="70" width="12" height="8" fill="#7B2FF7" />
-                  <rect x="96" y="74" width="8" height="8" fill="#1A1A2E" />
-                  <rect x="112" y="72" width="14" height="6" fill="#1A1A2E" />
-                  <rect x="54" y="86" width="8" height="8" fill="#7B2FF7" />
-                  <rect x="70" y="84" width="16" height="6" fill="#1A1A2E" />
-                  <rect x="92" y="88" width="12" height="6" fill="#1A1A2E" />
-                  <rect x="54" y="100" width="10" height="8" fill="#1A1A2E" />
-                  <rect x="72" y="98" width="10" height="12" fill="#7B2FF7" />
-                  <rect x="90" y="102" width="8" height="8" fill="#1A1A2E" />
-                  <rect x="106" y="98" width="18" height="10" fill="#1A1A2E" />
-                  <rect x="58" y="116" width="14" height="10" fill="#1A1A2E" />
-                  <rect x="80" y="118" width="10" height="8" fill="#7B2FF7" />
-                  <rect x="98" y="116" width="8" height="8" fill="#1A1A2E" />
-                  <rect x="114" y="116" width="12" height="10" fill="#1A1A2E" />
-
-                  {/* Center Solana logo badge */}
-                  <circle cx="70" cy="70" r="14" fill="#FFFFFF" stroke="#E4E4F0" strokeWidth="2" />
-                  <path
-                    d="M64 66L76 66M64 70L76 70M64 74L76 74"
-                    stroke="#7B2FF7"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
+                {hasRealSolanaWallet && qrImageUrl ? (
+                  <img
+                    src={qrImageUrl}
+                    alt="Solana Pay QR Code"
+                    className="w-40 h-40 object-contain rounded-lg"
                   />
-                </svg>
+                ) : (
+                  /* Simulated QR Code SVG pattern */
+                  <svg
+                    className="w-40 h-40"
+                    viewBox="0 0 140 140"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <rect width="140" height="140" rx="8" fill="#FBFBFF" />
+                    {/* Top-left position block */}
+                    <rect x="14" y="14" width="32" height="32" rx="4" fill="#7B2FF7" />
+                    <rect x="20" y="20" width="20" height="20" rx="2" fill="#FFFFFF" />
+                    <rect x="25" y="25" width="10" height="10" rx="1" fill="#7B2FF7" />
+
+                    {/* Top-right position block */}
+                    <rect x="94" y="14" width="32" height="32" rx="4" fill="#7B2FF7" />
+                    <rect x="100" y="20" width="20" height="20" rx="2" fill="#FFFFFF" />
+                    <rect x="105" y="25" width="10" height="10" rx="1" fill="#7B2FF7" />
+
+                    {/* Bottom-left position block */}
+                    <rect x="14" y="94" width="32" height="32" rx="4" fill="#7B2FF7" />
+                    <rect x="20" y="100" width="20" height="20" rx="2" fill="#FFFFFF" />
+                    <rect x="25" y="105" width="10" height="10" rx="1" fill="#7B2FF7" />
+
+                    {/* Simulated matrix pixels */}
+                    <rect x="54" y="18" width="6" height="6" fill="#1A1A2E" />
+                    <rect x="66" y="18" width="8" height="6" fill="#1A1A2E" />
+                    <rect x="78" y="18" width="6" height="6" fill="#1A1A2E" />
+                    <rect x="54" y="28" width="10" height="6" fill="#7B2FF7" />
+                    <rect x="70" y="28" width="14" height="6" fill="#1A1A2E" />
+                    <rect x="58" y="40" width="8" height="8" fill="#1A1A2E" />
+                    <rect x="74" y="40" width="6" height="8" fill="#7B2FF7" />
+                    <rect x="18" y="56" width="8" height="8" fill="#1A1A2E" />
+                    <rect x="32" y="56" width="6" height="6" fill="#7B2FF7" />
+                    <rect x="46" y="54" width="12" height="10" fill="#1A1A2E" />
+                    <rect x="66" y="56" width="10" height="6" fill="#1A1A2E" />
+                    <rect x="84" y="54" width="8" height="12" fill="#7B2FF7" />
+                    <rect x="100" y="58" width="12" height="6" fill="#1A1A2E" />
+                    <rect x="118" y="54" width="8" height="8" fill="#1A1A2E" />
+                    <rect x="56" y="72" width="14" height="6" fill="#1A1A2E" />
+                    <rect x="76" y="70" width="12" height="8" fill="#7B2FF7" />
+                    <rect x="96" y="74" width="8" height="8" fill="#1A1A2E" />
+                    <rect x="112" y="72" width="14" height="6" fill="#1A1A2E" />
+                    <rect x="54" y="86" width="8" height="8" fill="#7B2FF7" />
+                    <rect x="70" y="84" width="16" height="6" fill="#1A1A2E" />
+                    <rect x="92" y="88" width="12" height="6" fill="#1A1A2E" />
+                    <rect x="54" y="100" width="10" height="8" fill="#1A1A2E" />
+                    <rect x="72" y="98" width="10" height="12" fill="#7B2FF7" />
+                    <rect x="90" y="102" width="8" height="8" fill="#1A1A2E" />
+                    <rect x="106" y="98" width="18" height="10" fill="#1A1A2E" />
+                    <rect x="58" y="116" width="14" height="10" fill="#1A1A2E" />
+                    <rect x="80" y="118" width="10" height="8" fill="#7B2FF7" />
+                    <rect x="98" y="116" width="8" height="8" fill="#1A1A2E" />
+                    <rect x="114" y="116" width="12" height="10" fill="#1A1A2E" />
+
+                    {/* Center Solana logo badge */}
+                    <circle
+                      cx="70"
+                      cy="70"
+                      r="14"
+                      fill="#FFFFFF"
+                      stroke="#E4E4F0"
+                      strokeWidth="2"
+                    />
+                    <path
+                      d="M64 66L76 66M64 70L76 70M64 74L76 74"
+                      stroke="#7B2FF7"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                )}
 
                 {/* Badge inside card */}
                 <span className="absolute bottom-1 bg-white/95 px-2 py-0.5 rounded-full text-[10px] text-muted-foreground border border-border shadow-xs">
-                  QR Code Demonstrativo
+                  {hasRealSolanaWallet ? 'Solana Pay Protocol' : 'QR Code Demonstrativo'}
                 </span>
               </div>
 
@@ -176,11 +241,25 @@ export const SolanaPaymentModal: React.FC<SolanaPaymentModalProps> = ({
               <div className="text-center mt-3 space-y-1">
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 text-[#7B2FF7] text-xs font-semibold">
                   <span className="w-2 h-2 rounded-full bg-[#7B2FF7] animate-pulse" />
-                  Pagamento via Solana
+                  {hasRealSolanaWallet ? 'Solana Pay (USDC / SOL)' : 'Pagamento via Solana'}
                 </div>
-                <p className="text-xs text-muted-foreground max-w-xs px-2">
-                  Pagamentos rápidos, de baixo custo e verificáveis.
-                </p>
+                {hasRealSolanaWallet ? (
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-mono text-muted-foreground truncate max-w-[260px] mx-auto">
+                      Destino: {effectiveRecipient.slice(0, 6)}...{effectiveRecipient.slice(-6)}
+                    </p>
+                    <button
+                      onClick={handleCopySolanaPayUrl}
+                      className="text-[11px] text-[#7B2FF7] font-semibold hover:underline inline-flex items-center gap-1"
+                    >
+                      <Copy className="w-3 h-3" /> Copiar URL Solana Pay
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground max-w-xs px-2">
+                    Pagamentos rápidos, de baixo custo e verificáveis.
+                  </p>
+                )}
               </div>
             </div>
 

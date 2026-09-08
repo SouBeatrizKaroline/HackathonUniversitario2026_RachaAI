@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useRacha } from '@/context/RachaContext'
-import { parseNaturalLanguageRacha } from '@/lib/geminiParser'
+import { parseRachaWithGemini } from '@/services/geminiService'
 import { InterpretedRachaData, formatCurrencyBRL, CATEGORIES } from '@/types/racha'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -59,6 +59,9 @@ export default function AssistantPage() {
 
   const [inputText, setInputText] = useState('')
   const [isTyping, setIsTyping] = useState(false)
+  const [aiSource, setAiSource] = useState<'gemini_api' | 'gemini_gateway' | 'client_fallback'>(
+    'gemini_gateway',
+  )
   const [currentExtracted, setCurrentExtracted] = useState<InterpretedRachaData | undefined>(
     undefined,
   )
@@ -101,22 +104,27 @@ export default function AssistantPage() {
     setInputText('')
     setIsTyping(true)
 
-    // Simulate Gemini ~800ms
-    setTimeout(() => {
-      const { data, assistantMessage } = parseNaturalLanguageRacha(text, currentExtracted)
-      setCurrentExtracted(data)
+    // Call Gemini backend / Skip AI with fallback
+    parseRachaWithGemini(text, currentExtracted)
+      .then(({ data, assistantMessage, source }) => {
+        setCurrentExtracted(data)
+        setAiSource(source)
 
-      const botMsg: Message = {
-        id: `a-${Date.now()}`,
-        sender: 'assistant',
-        text: assistantMessage,
-        data,
-        showActionCard: true,
-      }
+        const botMsg: Message = {
+          id: `a-${Date.now()}`,
+          sender: 'assistant',
+          text: assistantMessage,
+          data,
+          showActionCard: true,
+        }
 
-      setIsTyping(false)
-      setMessages((prev) => [...prev, botMsg])
-    }, 850)
+        setIsTyping(false)
+        setMessages((prev) => [...prev, botMsg])
+      })
+      .catch((err) => {
+        console.error('Erro na interpretação:', err)
+        setIsTyping(false)
+      })
   }
 
   const handleCreateRachaFromData = (data: InterpretedRachaData) => {
@@ -157,12 +165,26 @@ export default function AssistantPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-base sm:text-lg font-bold text-foreground flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-[#7B2FF7]" />
-              Assistente Gemini
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-bold text-foreground flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-[#7B2FF7]" />
+                Assistente Gemini
+              </h1>
+              <Badge
+                variant="outline"
+                className="text-[10px] py-0 h-4 border-purple-200 text-[#7B2FF7] bg-purple-50"
+              >
+                {aiSource === 'gemini_api'
+                  ? 'Gemini API Oficial'
+                  : aiSource === 'gemini_gateway'
+                    ? 'Gemini Skip AI'
+                    : 'Modo Simulado'}
+              </Badge>
+            </div>
             <p className="text-[11px] text-muted-foreground">
-              Inteligência simulada em Português (pt-BR)
+              {aiSource === 'client_fallback'
+                ? 'Inteligência simulada em Português (pt-BR)'
+                : 'Conectado à IA real em Português (pt-BR)'}
             </p>
           </div>
         </div>

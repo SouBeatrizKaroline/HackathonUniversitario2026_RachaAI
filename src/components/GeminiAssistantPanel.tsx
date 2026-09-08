@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { Racha, formatCurrencyBRL } from '@/types/racha'
+import { askGeminiAboutRacha } from '@/services/geminiService'
 import { Button } from '@/components/ui/button'
-import { Sparkles, X, Send, Bot, AlertCircle, Check } from 'lucide-react'
+import { Sparkles, X, Send, AlertCircle, Check, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface GeminiAssistantPanelProps {
@@ -36,19 +37,13 @@ export const GeminiAssistantPanel: React.FC<GeminiAssistantPanelProps> = ({
     },
   ])
   const [inputVal, setInputVal] = useState('')
+  const [isAsking, setIsAsking] = useState(false)
 
   if (!isOpen) return null
 
-  // Calculate live numbers
-  const total = racha.totalAmount
-  const paidParticipants = racha.participants.filter((p) => p.paid)
-  const pendingParticipants = racha.participants.filter((p) => !p.paid)
-  const paidAmount = paidParticipants.reduce((acc, curr) => acc + curr.amount, 0)
-  const pendingAmount = Math.max(0, total - paidAmount)
-
-  const handleAsk = (query: string) => {
+  const handleAsk = async (query: string) => {
     const q = query.trim()
-    if (!q) return
+    if (!q || isAsking) return
 
     const userMsg: MiniMessage = {
       id: `u-${Date.now()}`,
@@ -58,55 +53,34 @@ export const GeminiAssistantPanel: React.FC<GeminiAssistantPanelProps> = ({
 
     setMessages((prev) => [...prev, userMsg])
     setInputVal('')
+    setIsAsking(true)
 
-    setTimeout(() => {
-      let botResponse = ''
-      let actionObj: MiniMessage['action'] = undefined
-
-      const lower = q.toLowerCase()
-
-      if (
-        lower.includes('quem ainda não pagou') ||
-        lower.includes('pendente') ||
-        lower.includes('quem falta')
-      ) {
-        if (pendingParticipants.length === 0) {
-          botResponse = 'Boas notícias! 🎉 Todos os participantes já pagaram suas partes.'
-        } else {
-          const names = pendingParticipants.map((p) => p.name).join(', ')
-          botResponse = `Ainda faltam pagar (${pendingParticipants.length} pessoas): ${names}.`
-        }
-      } else if (lower.includes('quanto falta') || lower.includes('falta')) {
-        botResponse = `Faltam ${formatCurrencyBRL(pendingAmount)} para completar os ${formatCurrencyBRL(total)} da meta.`
-      } else if (
-        lower.includes('duas pessoas') ||
-        lower.includes('mais 2') ||
-        lower.includes('adicionarmos')
-      ) {
-        const newCount = racha.participants.length + 2
-        const newSplit = Math.round((total / newCount) * 100) / 100
-        botResponse = `Com 8 pessoas (adicionando mais 2), cada uma pagaria ${formatCurrencyBRL(newSplit)}. Posso sugerir o novo valor, mas para aplicar, confirme para mim.`
-        actionObj = {
-          type: 'add_people',
-          count: newCount,
-          newPerPerson: newSplit,
-        }
-      } else if (lower.includes('resumo') || lower.includes('geral') || lower.includes('status')) {
-        botResponse = `${paidParticipants.length} de ${racha.participants.length} participantes já pagaram. Foram arrecadados ${formatCurrencyBRL(paidAmount)} dos ${formatCurrencyBRL(total)}. Ainda faltam ${formatCurrencyBRL(pendingAmount)}.`
-      } else {
-        botResponse = `Entendido! Atualmente o racha tem ${racha.participants.length} participantes com meta de ${formatCurrencyBRL(total)}. Arrecadado: ${formatCurrencyBRL(paidAmount)} (${racha.participants.length > 0 ? Math.round((paidAmount / total) * 100) : 0}%).`
-      }
-
+    try {
+      const result = await askGeminiAboutRacha(q, racha)
       setMessages((prev) => [
         ...prev,
         {
           id: `g-${Date.now()}`,
           sender: 'gemini',
-          text: botResponse,
-          action: actionObj,
+          text: result.text,
+          action: result.action,
         },
       ])
-    }, 600)
+    } catch (err) {
+      console.error('Erro ao consultar Gemini:', err)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `g-${Date.now()}`,
+          sender: 'gemini',
+          text: `Não consegui processar a resposta agora, mas o racha tem meta de ${formatCurrencyBRL(
+            racha.totalAmount,
+          )}.`,
+        },
+      ])
+    } finally {
+      setIsAsking(false)
+    }
   }
 
   const handleApplyAction = (action: NonNullable<MiniMessage['action']>) => {
@@ -231,17 +205,22 @@ export const GeminiAssistantPanel: React.FC<GeminiAssistantPanelProps> = ({
             <input
               type="text"
               value={inputVal}
+              disabled={isAsking}
               onChange={(e) => setInputVal(e.target.value)}
-              placeholder="Pergunte ao Gemini..."
-              className="flex-1 h-10 px-3.5 rounded-xl bg-[#F7F7FB] border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#7B2FF7] text-foreground"
+              placeholder={isAsking ? 'Gemini analisando...' : 'Pergunte ao Gemini...'}
+              className="flex-1 h-10 px-3.5 rounded-xl bg-[#F7F7FB] border border-border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#7B2FF7] text-foreground disabled:opacity-50"
             />
             <Button
               type="submit"
-              disabled={!inputVal.trim()}
+              disabled={!inputVal.trim() || isAsking}
               className="h-10 w-10 p-0 rounded-xl bg-[#7B2FF7] hover:bg-[#6A23E0] text-white flex items-center justify-center shrink-0 disabled:opacity-40"
             >
-              <Send className="w-4 h-4" />
-            </Button>
+              {isAsking ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </Button>{' '}
           </form>
         </div>
       </div>

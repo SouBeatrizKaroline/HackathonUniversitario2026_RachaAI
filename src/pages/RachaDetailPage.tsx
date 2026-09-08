@@ -35,6 +35,7 @@ export default function RachaDetailPage() {
   const location = useLocation()
   const {
     getRacha,
+    fetchRemoteRacha,
     markParticipantPaid,
     markParticipantPending,
     removeParticipantFromRacha,
@@ -45,7 +46,17 @@ export default function RachaDetailPage() {
   } = useRacha()
 
   const rachaId = id || 'demo'
+  const [remoteLoading, setRemoteLoading] = useState(false)
   const racha = getRacha(rachaId)
+
+  // In case of link shared directly from another device (/racha/:shareCode or /racha/:id),
+  // fetch from remote if not already in local memory
+  useEffect(() => {
+    if (!racha && rachaId && rachaId !== 'demo') {
+      setRemoteLoading(true)
+      fetchRemoteRacha(rachaId).finally(() => setRemoteLoading(false))
+    }
+  }, [racha, rachaId, fetchRemoteRacha])
 
   // Success banner when just created
   const [showCreatedBanner, setShowCreatedBanner] = useState(
@@ -68,13 +79,24 @@ export default function RachaDetailPage() {
   if (!racha) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12 text-center space-y-4">
-        <h2 className="text-xl font-bold">Racha não encontrado</h2>
-        <p className="text-sm text-muted-foreground">
-          O racha solicitado não existe ou foi removido.
-        </p>
-        <Button asChild className="bg-[#7B2FF7]">
-          <Link to="/dashboard">Voltar ao início</Link>
-        </Button>
+        {remoteLoading ? (
+          <div className="py-12 space-y-3">
+            <div className="w-8 h-8 border-4 border-[#7B2FF7] border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-sm text-muted-foreground font-medium">
+              Carregando racha compartilhado...
+            </p>
+          </div>
+        ) : (
+          <>
+            <h2 className="text-xl font-bold">Racha não encontrado</h2>
+            <p className="text-sm text-muted-foreground">
+              O racha solicitado não foi encontrado no banco de dados ou o link expirou.
+            </p>
+            <Button asChild className="bg-[#7B2FF7]">
+              <Link to="/dashboard">Voltar ao início</Link>
+            </Button>
+          </>
+        )}
       </div>
     )
   }
