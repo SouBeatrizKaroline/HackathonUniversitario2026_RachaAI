@@ -4,6 +4,8 @@ import { useRacha } from '@/context/RachaContext'
 import { formatCurrencyBRL, Participant } from '@/types/racha'
 import { SolanaPaymentModal } from '@/components/SolanaPaymentModal'
 import { ShareModal } from '@/components/ShareModal'
+import { CobrancaModal } from '@/components/CobrancaModal'
+import { OrganizerPanelModal } from '@/components/OrganizerPanelModal'
 import { GeminiAssistantPanel } from '@/components/GeminiAssistantPanel'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +28,9 @@ import {
   TrendingUp,
   AlertCircle,
   Users,
+  Sliders,
+  BellRing,
+  Repeat,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -41,6 +46,7 @@ export default function RachaDetailPage() {
     removeParticipantFromRacha,
     addParticipantToRacha,
     updateRacha,
+    saveOrganizerChanges,
     currentNickname,
     setIsNicknameModalOpen,
   } = useRacha()
@@ -75,6 +81,9 @@ export default function RachaDetailPage() {
   const [paymentParticipant, setPaymentParticipant] = useState<Participant | null>(null)
   const [isShareModalOpen, setIsShareModalOpen] = useState(false)
   const [isGeminiSheetOpen, setIsGeminiSheetOpen] = useState(false)
+  const [isOrganizerModalOpen, setIsOrganizerModalOpen] = useState(false)
+  const [cobrancaParticipant, setCobrancaParticipant] = useState<Participant | null>(null)
+  const [isCobrancaModalOpen, setIsCobrancaModalOpen] = useState(false)
 
   if (!racha) {
     return (
@@ -145,6 +154,35 @@ export default function RachaDetailPage() {
     }
   }
 
+  // Handle Cobrança click
+  const handleCobrarParticipant = (p: Participant) => {
+    setCobrancaParticipant(p)
+    setIsCobrancaModalOpen(true)
+  }
+
+  // Handle Organizer Save
+  const handleSaveOrganizer = async (changes: {
+    name: string
+    totalAmount: number
+    splitType: 'equal' | 'custom'
+    participants: Participant[]
+    isRecurring?: boolean
+    recurringGroupName?: string
+  }) => {
+    await saveOrganizerChanges(racha.id, {
+      name: changes.name,
+      totalAmount: changes.totalAmount,
+      splitType: changes.splitType,
+      participants: changes.participants,
+    })
+    if (changes.isRecurring !== undefined) {
+      await updateRacha(racha.id, {
+        isRecurring: changes.isRecurring,
+        recurringGroupName: changes.recurringGroupName,
+      })
+    }
+  }
+
   // Join racha if not in list
   const handleJoinRacha = () => {
     const name = currentNickname || 'Você'
@@ -212,6 +250,14 @@ export default function RachaDetailPage() {
                   Demonstração
                 </Badge>
               )}
+              {racha.isRecurring && (
+                <Badge
+                  variant="outline"
+                  className="border-purple-300 text-[#7B2FF7] bg-purple-50 text-[10px] shrink-0 font-medium"
+                >
+                  🏠 Recorrente {racha.referenceMonth ? `(${racha.referenceMonth})` : ''}
+                </Badge>
+              )}
             </div>
             <p className="text-[11px] text-muted-foreground font-medium">
               {racha.category} • Criado em {new Date(racha.createdAt).toLocaleDateString('pt-BR')}
@@ -219,15 +265,29 @@ export default function RachaDetailPage() {
           </div>
         </div>
 
-        <Button
-          onClick={() => setIsShareModalOpen(true)}
-          variant="outline"
-          size="sm"
-          className="rounded-xl border-border hover:bg-[#F7F7FB] text-xs font-semibold gap-1.5 h-9"
-        >
-          <Share2 className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Compartilhar</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Organizer panel button */}
+          <Button
+            onClick={() => setIsOrganizerModalOpen(true)}
+            variant="outline"
+            size="sm"
+            className="rounded-xl border-purple-200 text-[#7B2FF7] hover:bg-purple-50 text-xs font-semibold gap-1.5 h-9"
+            title="Administrar racha"
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Painel</span>
+          </Button>
+
+          <Button
+            onClick={() => setIsShareModalOpen(true)}
+            variant="outline"
+            size="sm"
+            className="rounded-xl border-border hover:bg-[#F7F7FB] text-xs font-semibold gap-1.5 h-9"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Compartilhar</span>
+          </Button>
+        </div>
       </div>
 
       {/* 2. SUCCESS BANNER ON CREATION */}
@@ -301,6 +361,20 @@ export default function RachaDetailPage() {
               style={{ width: `${percent}%` }}
             />
           </div>
+        </div>
+
+        {/* Organizer quick banner */}
+        <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Sliders className="w-3.5 h-3.5 text-[#7B2FF7]" />
+            <span>Organizador: edite participantes, valores ou gerencie cobranças</span>
+          </div>
+          <button
+            onClick={() => setIsOrganizerModalOpen(true)}
+            className="text-xs font-bold text-[#7B2FF7] hover:underline shrink-0"
+          >
+            Abrir painel
+          </button>
         </div>
       </div>
 
@@ -380,6 +454,21 @@ export default function RachaDetailPage() {
                     </span>
                   </div>
 
+                  {/* Action buttons: Cobrar (if pending) + dropdown */}
+                  {!p.paid && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleCobrarParticipant(p)}
+                      className="h-8 px-2.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-200 rounded-lg flex items-center gap-1 shadow-2xs"
+                      title={`Cobrar ${p.name}`}
+                    >
+                      <BellRing className="w-3 h-3 text-amber-600" />
+                      <span>Cobrar</span>
+                    </Button>
+                  )}
+
                   {/* Participant actions dropdown */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -392,16 +481,25 @@ export default function RachaDetailPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                       align="end"
-                      className="rounded-xl w-44 text-xs font-medium"
+                      className="rounded-xl w-48 text-xs font-medium"
                     >
                       {!p.paid ? (
-                        <DropdownMenuItem
-                          onClick={() => handleOpenPaymentFor(p)}
-                          className="cursor-pointer text-emerald-700"
-                        >
-                          <Zap className="w-3.5 h-3.5 mr-2" />
-                          Simular pagamento
-                        </DropdownMenuItem>
+                        <>
+                          <DropdownMenuItem
+                            onClick={() => handleCobrarParticipant(p)}
+                            className="cursor-pointer text-amber-800 font-semibold"
+                          >
+                            <BellRing className="w-3.5 h-3.5 mr-2 text-amber-600" />
+                            Cobrar participante
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleOpenPaymentFor(p)}
+                            className="cursor-pointer text-emerald-700"
+                          >
+                            <Zap className="w-3.5 h-3.5 mr-2" />
+                            Simular pagamento
+                          </DropdownMenuItem>
+                        </>
                       ) : (
                         <DropdownMenuItem
                           onClick={() => {
@@ -414,6 +512,14 @@ export default function RachaDetailPage() {
                           Marcar como pendente
                         </DropdownMenuItem>
                       )}
+
+                      <DropdownMenuItem
+                        onClick={() => setIsOrganizerModalOpen(true)}
+                        className="cursor-pointer text-foreground"
+                      >
+                        <Sliders className="w-3.5 h-3.5 mr-2 text-[#7B2FF7]" />
+                        Editar valor individual
+                      </DropdownMenuItem>
 
                       <DropdownMenuItem
                         onClick={() => {
@@ -590,6 +696,21 @@ export default function RachaDetailPage() {
         rachaName={racha.name}
         shareCode={racha.shareCode || 'viagem-congresso-7k2m'}
         perPersonAmount={avgShare}
+      />
+
+      <CobrancaModal
+        open={isCobrancaModalOpen}
+        onOpenChange={setIsCobrancaModalOpen}
+        rachaName={racha.name}
+        shareCode={racha.shareCode || 'viagem-congresso-7k2m'}
+        participant={cobrancaParticipant}
+      />
+
+      <OrganizerPanelModal
+        open={isOrganizerModalOpen}
+        onOpenChange={setIsOrganizerModalOpen}
+        racha={racha}
+        onSave={handleSaveOrganizer}
       />
 
       <GeminiAssistantPanel

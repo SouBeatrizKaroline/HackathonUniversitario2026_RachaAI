@@ -106,6 +106,55 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [notifications])
 
+  // Seed default República Recurring group if not present so user can test República out of the box
+  useEffect(() => {
+    setRachas((prev) => {
+      const hasRecurring = prev.some(
+        (r) => r.isRecurring || r.recurringGroupId === 'republica-demo',
+      )
+      if (hasRecurring) return prev
+
+      const demoRepublic: Racha = {
+        id: 'demo-republica-1',
+        name: 'República Aloprados - Maio/2025',
+        category: 'República',
+        totalAmount: 1800,
+        splitType: 'equal',
+        isRecurring: true,
+        recurringGroupId: 'republica-demo',
+        recurringGroupName: 'República Aloprados',
+        referenceMonth: 'Maio/2025',
+        creatorNickname: 'Lucas',
+        description: 'Aluguel, internet de fibra e contas de consumo da república.',
+        createdAt: new Date(Date.now() - 3600 * 1000 * 24 * 5).toISOString(),
+        participants: [
+          { id: 'rep-p1', name: 'Lucas', amount: 450, paid: true, paidAt: 'Há 3 dias' },
+          { id: 'rep-p2', name: 'Mateus', amount: 450, paid: true, paidAt: 'Há 2 dias' },
+          { id: 'rep-p3', name: 'Rodrigo', amount: 450, paid: false },
+          { id: 'rep-p4', name: 'Gabriel', amount: 450, paid: false },
+        ],
+        history: [
+          {
+            id: 'rep-h1',
+            participantName: 'Lucas',
+            amount: 450,
+            timestamp: 'Há 3 dias',
+            status: 'Confirmado',
+          },
+          {
+            id: 'rep-h2',
+            participantName: 'Mateus',
+            amount: 450,
+            timestamp: 'Há 2 dias',
+            status: 'Confirmado',
+          },
+        ],
+      }
+
+      return [...prev, demoRepublic]
+    })
+  }, [])
+
   const [isNicknameModalOpen, setIsNicknameModalOpen] = useState(false)
   const [isWhySolanaModalOpen, setIsWhySolanaModalOpen] = useState(false)
 
@@ -685,8 +734,46 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const resetDemoRacha = useCallback(() => {
     setRachas((prev) => {
-      const filtered = prev.filter((r) => r.id !== 'demo' && !r.isDemo)
-      return [DEMO_RACHA, ...filtered]
+      const filtered = prev.filter(
+        (r) => r.id !== 'demo' && !r.isDemo && r.id !== 'demo-republica-1',
+      )
+      const demoRepublic: Racha = {
+        id: 'demo-republica-1',
+        name: 'República Aloprados - Maio/2025',
+        category: 'República',
+        totalAmount: 1800,
+        splitType: 'equal',
+        isRecurring: true,
+        recurringGroupId: 'republica-demo',
+        recurringGroupName: 'República Aloprados',
+        referenceMonth: 'Maio/2025',
+        creatorNickname: 'Lucas',
+        description: 'Aluguel, internet de fibra e contas de consumo da república.',
+        createdAt: new Date().toISOString(),
+        participants: [
+          { id: 'rep-p1', name: 'Lucas', amount: 450, paid: true, paidAt: 'Há 3 dias' },
+          { id: 'rep-p2', name: 'Mateus', amount: 450, paid: true, paidAt: 'Há 2 dias' },
+          { id: 'rep-p3', name: 'Rodrigo', amount: 450, paid: false },
+          { id: 'rep-p4', name: 'Gabriel', amount: 450, paid: false },
+        ],
+        history: [
+          {
+            id: 'rep-h1',
+            participantName: 'Lucas',
+            amount: 450,
+            timestamp: 'Há 3 dias',
+            status: 'Confirmado',
+          },
+          {
+            id: 'rep-h2',
+            participantName: 'Mateus',
+            amount: 450,
+            timestamp: 'Há 2 dias',
+            status: 'Confirmado',
+          },
+        ],
+      }
+      return [DEMO_RACHA, demoRepublic, ...filtered]
     })
   }, [])
 

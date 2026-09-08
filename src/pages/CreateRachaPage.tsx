@@ -53,6 +53,8 @@ export default function CreateRachaPage() {
   )
   const [category, setCategory] = useState<RachaCategory>(prefilled?.category || 'Faculdade')
   const [splitMode, setSplitMode] = useState<'equal' | 'custom'>('equal')
+  const [isRecurring, setIsRecurring] = useState(prefilled?.category === 'República')
+  const [recurringGroupName, setRecurringGroupName] = useState('')
 
   const [participants, setParticipants] = useState<ParticipantRow[]>(() => {
     if (prefilled?.participants && prefilled.participants.length > 0) {
@@ -187,11 +189,33 @@ export default function CreateRachaPage() {
 
     setIsSubmitting(true)
     try {
+      const months = [
+        'Janeiro',
+        'Fevereiro',
+        'Março',
+        'Abril',
+        'Maio',
+        'Junho',
+        'Julho',
+        'Agosto',
+        'Setembro',
+        'Outubro',
+        'Novembro',
+        'Dezembro',
+      ]
+      const curMonth = `${months[new Date().getMonth()]}/${new Date().getFullYear()}`
+      const recGroupId = isRecurring ? `group-${generateId()}` : undefined
+
       const newRacha = await createRacha({
-        name: name.trim(),
+        name: isRecurring && !name.includes('/') ? `${name.trim()} - ${curMonth}` : name.trim(),
         category,
         totalAmount,
         splitType: splitMode,
+        isRecurring,
+        recurringGroupId: recGroupId,
+        recurringGroupName: isRecurring ? recurringGroupName.trim() || name.trim() : undefined,
+        referenceMonth: isRecurring ? curMonth : undefined,
+        creatorNickname: currentNickname || 'Você',
         participants: participants.map((p) => ({
           id: p.id,
           name: p.name.trim() || 'Sem nome',
@@ -287,7 +311,16 @@ export default function CreateRachaPage() {
               <Label className="text-xs font-bold uppercase tracking-wider text-foreground">
                 Categoria
               </Label>
-              <Select value={category} onValueChange={(val) => setCategory(val as RachaCategory)}>
+              <Select
+                value={category}
+                onValueChange={(val) => {
+                  const cat = val as RachaCategory
+                  setCategory(cat)
+                  if (cat === 'República') {
+                    setIsRecurring(true)
+                  }
+                }}
+              >
                 <SelectTrigger className="h-11 rounded-xl text-sm font-medium border-border bg-white">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
@@ -300,6 +333,50 @@ export default function CreateRachaPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          {/* Modo República Toggle Card */}
+          <div className="pt-2 border-t border-border/80">
+            <div className="p-3.5 rounded-xl bg-purple-50/70 border border-purple-200/80 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🏠</span>
+                  <div>
+                    <span className="text-xs font-bold text-foreground block">
+                      Modo República (Despesa Recorrente)
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Fixa os moradores e gera cobranças automáticas todo mês
+                    </span>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  id="recurring-checkbox"
+                  checked={isRecurring}
+                  onChange={(e) => setIsRecurring(e.target.checked)}
+                  className="w-4 h-4 rounded text-[#7B2FF7] accent-[#7B2FF7] cursor-pointer"
+                />
+              </div>
+
+              {isRecurring && (
+                <div className="pt-2 border-t border-purple-200/60 space-y-1">
+                  <Label className="text-[11px] font-semibold text-muted-foreground">
+                    Nome do grupo / república
+                  </Label>
+                  <Input
+                    type="text"
+                    placeholder="Ex.: República Aloprados"
+                    value={recurringGroupName}
+                    onChange={(e) => setRecurringGroupName(e.target.value)}
+                    className="h-9 text-xs bg-white border-purple-200"
+                  />
+                  <p className="text-[10px] text-purple-700">
+                    💡 Cada mês terá sua própria cobrança mantendo o mesmo grupo de participantes.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

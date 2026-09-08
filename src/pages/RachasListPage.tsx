@@ -152,7 +152,7 @@ export default function RachasListPage() {
                   <div className="flex items-start gap-3">
                     <span className="text-2xl mt-0.5">{getEmoji(racha.category)}</span>
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-base font-bold text-foreground group-hover:text-[#7B2FF7] transition-colors line-clamp-1">
                           {racha.name}
                         </h3>
@@ -164,10 +164,19 @@ export default function RachasListPage() {
                             Demo
                           </Badge>
                         )}
+                        {racha.isRecurring && (
+                          <Badge
+                            variant="outline"
+                            className="border-purple-300 text-[#7B2FF7] bg-purple-50 text-[10px] shrink-0"
+                          >
+                            🏠 Recorrente
+                          </Badge>
+                        )}
                       </div>
                       <span className="text-xs text-muted-foreground font-medium">
                         {racha.category} • {racha.participants.length} participantes (
                         {pendingCount === 0 ? 'tudo pago' : `${pendingCount} pendentes`})
+                        {racha.referenceMonth && ` • ${racha.referenceMonth}`}
                       </span>
                     </div>
                   </div>

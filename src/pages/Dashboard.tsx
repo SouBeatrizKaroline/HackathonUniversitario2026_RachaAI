@@ -13,7 +13,11 @@ import {
   TrendingUp,
   RotateCcw,
   Layers,
+  Repeat,
+  Calendar,
+  ChevronRight,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 const SUGGESTIONS = [
   {
@@ -42,8 +46,9 @@ const SUGGESTIONS = [
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { rachas, currentNickname } = useRacha()
+  const { rachas, currentNickname, createNextMonthRecurring } = useRacha()
   const [inputText, setInputText] = useState('')
+  const [creatingGroupMonth, setCreatingGroupMonth] = useState<string | null>(null)
 
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault()
@@ -69,6 +74,34 @@ export default function Dashboard() {
   const demoRacha = rachas.find((r) => r.id === 'demo' || r.isDemo)
   // Non-demo rachas
   const regularRachas = rachas.filter((r) => r.id !== 'demo' && !r.isDemo)
+
+  // Recurring groups aggregation
+  const recurringRachas = rachas.filter((r) => Boolean(r.isRecurring || r.recurringGroupId))
+
+  // Group recurring rachas by recurringGroupId or groupName
+  const recurringGroupsMap = new Map<string, Racha[]>()
+  for (const r of recurringRachas) {
+    const key = r.recurringGroupId || r.recurringGroupName || r.name
+    if (!recurringGroupsMap.has(key)) {
+      recurringGroupsMap.set(key, [])
+    }
+    recurringGroupsMap.get(key)!.push(r)
+  }
+
+  const handleGenerateNextMonth = async (groupId: string, groupName: string) => {
+    setCreatingGroupMonth(groupId)
+    try {
+      const created = await createNextMonthRecurring(groupId)
+      if (created) {
+        toast.success(`Novo mês gerado para ${groupName}! 🏠`)
+        navigate(`/racha/${created.id}`)
+      }
+    } catch {
+      toast.error('Erro ao gerar próximo mês.')
+    } finally {
+      setCreatingGroupMonth(null)
+    }
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-3 sm:py-6 space-y-6">
@@ -140,6 +173,141 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* 2.5 RECURRING GROUPS SECTION (Modo República) */}
+      {recurringGroupsMap.size > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-amber-100 text-amber-700">
+                <Repeat className="w-4 h-4" />
+              </span>
+              <h2 className="text-lg font-bold tracking-tight text-foreground">
+                Recorrentes (Modo República)
+              </h2>
+            </div>
+            <span className="text-xs text-muted-foreground font-medium">
+              {recurringGroupsMap.size} {recurringGroupsMap.size === 1 ? 'grupo' : 'grupos'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            {Array.from(recurringGroupsMap.entries()).map(([groupId, groupList]) => {
+              // Sort instances descending by creation date
+              const sorted = [...groupList].sort(
+                (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+              )
+              const latestInstance = sorted[0]
+              const groupName =
+                latestInstance.recurringGroupName || latestInstance.name.replace(/ - \w+\/\d+$/, '')
+
+              const totalParts = latestInstance.participants.length
+              const paidParts = latestInstance.participants.filter((p) => p.paid).length
+              const isMonthFinished = totalParts > 0 && paidParts === totalParts
+              const monthLabel =
+                latestInstance.referenceMonth ||
+                new Date(latestInstance.createdAt).toLocaleDateString('pt-BR', {
+                  month: 'long',
+                  year: 'numeric',
+                })
+
+              return (
+                <div
+                  key={groupId}
+                  className="bg-white rounded-2xl border-2 border-purple-200/90 p-4 sm:p-5 shadow-subtle space-y-3"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-border/70">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-2xl">🏠</span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold text-foreground">{groupName}</h3>
+                          <Badge className="bg-purple-100 text-[#7B2FF7] hover:bg-purple-100 text-[10px] font-bold">
+                            República Fixa
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {totalParts} moradores • {formatCurrencyBRL(latestInstance.totalAmount)}
+                          /mês
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={creatingGroupMonth === groupId}
+                        onClick={() => handleGenerateNextMonth(groupId, groupName)}
+                        className="text-xs font-semibold rounded-xl h-8 px-3 border-purple-200 hover:bg-purple-50 text-[#7B2FF7] gap-1"
+                      >
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>Gerar próximo mês</span>
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        asChild
+                        className="bg-[#7B2FF7] hover:bg-[#6A23E0] text-white text-xs font-semibold rounded-xl h-8 px-3"
+                      >
+                        <Link to={`/racha/${latestInstance.id}`}>Abrir mês</Link>
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Status of current month */}
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-foreground flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      Mês atual: <strong>{monthLabel}</strong>
+                    </span>
+                    <span
+                      className={`font-bold ${
+                        isMonthFinished ? 'text-emerald-700' : 'text-amber-700'
+                      }`}
+                    >
+                      {paidParts}/{totalParts} pagaram
+                    </span>
+                  </div>
+
+                  {/* Previous months history pills */}
+                  {sorted.length > 1 && (
+                    <div className="pt-2 border-t border-border/60">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1.5">
+                        Histórico de meses ({sorted.length})
+                      </span>
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                        {sorted.map((item) => {
+                          const pPaid = item.participants.filter((p) => p.paid).length
+                          const pTotal = item.participants.length
+                          const label = item.referenceMonth || 'Mês'
+
+                          return (
+                            <Link
+                              key={item.id}
+                              to={`/racha/${item.id}`}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#F7F7FB] border border-border hover:border-[#7B2FF7]/50 text-[11px] font-medium text-foreground transition-all shrink-0"
+                            >
+                              <span>{label}:</span>
+                              <span
+                                className={`font-bold ${
+                                  pPaid === pTotal ? 'text-emerald-600' : 'text-amber-600'
+                                }`}
+                              >
+                                {pPaid}/{pTotal}
+                              </span>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 3. PINNED DEMO RACHA BANNER */}
       {demoRacha && (
