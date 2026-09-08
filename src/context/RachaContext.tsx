@@ -317,7 +317,9 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const deleteRacha = useCallback((id: string) => {
     setRachas((prev) => prev.filter((racha) => racha.id !== id))
-    pb.collection('rachas').delete(id).catch(() => {})
+    pb.collection('rachas')
+      .delete(id)
+      .catch(() => {})
   }, [])
 
   const updateParticipant = useCallback(
@@ -644,12 +646,10 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const currentMonthIndex = new Date().getMonth()
       const nextMonthIndex = (currentMonthIndex + 1) % 12
       const nextMonthName = months[nextMonthIndex]
-      const year =
-        nextMonthIndex === 0 ? new Date().getFullYear() + 1 : new Date().getFullYear()
+      const year = nextMonthIndex === 0 ? new Date().getFullYear() + 1 : new Date().getFullYear()
       const referenceMonth = `${nextMonthName}/${year}`
 
-      const groupName =
-        template.recurringGroupName || template.name.replace(/ - \w+\/\d+$/, '')
+      const groupName = template.recurringGroupName || template.name.replace(/ - \w+\/\d+$/, '')
 
       const newRachaData: Omit<Racha, 'id' | 'createdAt' | 'history'> = {
         name: `${groupName} - ${referenceMonth}`,

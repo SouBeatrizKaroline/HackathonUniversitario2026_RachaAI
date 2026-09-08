@@ -29,19 +29,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
       "indexes": [
@@ -71,14 +66,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": [
-            "República",
-            "Comida",
-            "Viagem",
-            "Faculdade",
-            "Evento",
-            "Outro"
-          ]
+          "selectValues": ["República", "Comida", "Viagem", "Faculdade", "Evento", "Outro"]
         },
         {
           "name": "totalAmount",
@@ -91,10 +79,7 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "equal",
-            "custom"
-          ]
+          "selectValues": ["equal", "custom"]
         },
         {
           "name": "shareCode",
@@ -125,19 +110,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         },
         {
           "name": "isRecurring",
@@ -230,24 +210,17 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
-      "indexes": [
-        "CREATE INDEX idx_participantes_racha ON participantes (racha)"
-      ]
+      "indexes": ["CREATE INDEX idx_participantes_racha ON participantes (racha)"]
     },
     {
       "name": "pagamentos",
@@ -284,10 +257,7 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": [
-            "Confirmado",
-            "Pendente"
-          ]
+          "selectValues": ["Confirmado", "Pendente"]
         },
         {
           "name": "txHash",
@@ -306,19 +276,14 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate"
-          ]
+          "autodateTriggers": ["onCreate"]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": [
-            "onCreate",
-            "onUpdate"
-          ]
+          "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
       "indexes": [

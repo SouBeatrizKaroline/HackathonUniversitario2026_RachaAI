@@ -2,21 +2,13 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useRacha } from '@/context/RachaContext'
 import { formatCurrencyBRL } from '@/types/racha'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Bell, CheckCheck, Trash2, ArrowRight, CheckCircle2 } from 'lucide-react'
 
 export const NotificationCenter: React.FC = () => {
   const navigate = useNavigate()
-  const {
-    notifications,
-    unreadNotificationsCount,
-    markNotificationsAsRead,
-    clearNotifications,
-  } = useRacha()
+  const { notifications, unreadNotificationsCount, markNotificationsAsRead, clearNotifications } =
+    useRacha()
 
   const handleOpenChange = (open: boolean) => {
     if (open && unreadNotificationsCount > 0) {
