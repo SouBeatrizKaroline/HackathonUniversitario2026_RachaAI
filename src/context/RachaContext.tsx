@@ -1420,6 +1420,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [carteiras],
   )
 
+  // Atualiza as preferências de notificação individuais de um membro da carteira
   const updateMemberNotifPreferences = useCallback(
     async (carteiraId: string, memberKey: string, preferences: CarteiraNotifPreferences) => {
       const target = carteiras.find(
