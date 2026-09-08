@@ -28,9 +28,19 @@ interface RachaContextType {
   createRacha: (data: Omit<Racha, 'id' | 'createdAt' | 'history'>) => Promise<Racha>
   updateRacha: (id: string, updates: Partial<Racha>) => Promise<void>
   deleteRacha: (id: string) => void
-  markParticipantPaid: (rachaId: string, participantId: string, txHash?: string) => Promise<void>
+  markParticipantPaid: (
+    rachaId: string,
+    participantId: string,
+    txHash?: string,
+    userId?: string,
+  ) => Promise<void>
   markParticipantPending: (rachaId: string, participantId: string) => Promise<void>
-  addParticipantToRacha: (rachaId: string, name: string, amount?: number) => Promise<void>
+  addParticipantToRacha: (
+    rachaId: string,
+    name: string,
+    amount?: number,
+    userId?: string,
+  ) => Promise<void>
   removeParticipantFromRacha: (rachaId: string, participantId: string) => Promise<void>
   updateParticipant: (
     rachaId: string,
@@ -503,8 +513,14 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   )
 
   const markParticipantPaid = useCallback(
-    async (rachaId: string, participantId: string, customTxHash?: string) => {
+    async (
+      rachaId: string,
+      participantId: string,
+      customTxHash?: string,
+      customUserId?: string,
+    ) => {
       const hash = customTxHash || generateTxHash()
+      const effectiveUserId = customUserId || pb.authStore.record?.id || undefined
       let paidPName = ''
       let paidAmount = 0
       let targetRachaName = ''
@@ -523,6 +539,8 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 paid: true,
                 paidAt: 'Agora há pouco',
                 txHash: hash,
+                user: effectiveUserId || p.user,
+                isVerified: Boolean(effectiveUserId || p.user),
               }
               targetParticipant = updatedP
               paidPName = p.name
@@ -541,6 +559,8 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             timestamp: 'Agora há pouco',
             status: 'Confirmado',
             txHash: targetParticipant.txHash,
+            user: effectiveUserId || targetParticipant.user,
+            isVerified: Boolean(effectiveUserId || targetParticipant.user),
           }
 
           return {
@@ -570,7 +590,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // Sync backend
       try {
-        await recordParticipantPayment(rachaId, participantId, hash)
+        await recordParticipantPayment(rachaId, participantId, hash, effectiveUserId)
       } catch (err) {
         console.warn('Erro ao sincronizar pagamento no PocketBase:', err)
       }
@@ -625,7 +645,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [])
 
   const addParticipantToRacha = useCallback(
-    async (rachaId: string, name: string, amount?: number) => {
+    async (rachaId: string, name: string, amount?: number, customUserId?: string) => {
       const targetRacha = rachas.find((r) => r.id === rachaId || (rachaId === 'demo' && r.isDemo))
       const count = (targetRacha?.participants.length || 0) + 1
       const newAmount =
@@ -635,6 +655,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             ? Math.round((targetRacha.totalAmount / count) * 100) / 100
             : 0
 
+      const effectiveUserId = customUserId || pb.authStore.record?.id || undefined
       const tempId = generateId()
 
       setRachas((prev) =>
@@ -646,6 +667,8 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             name,
             amount: newAmount,
             paid: false,
+            user: effectiveUserId,
+            isVerified: Boolean(effectiveUserId),
           }
 
           return {
@@ -656,7 +679,12 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       )
 
       try {
-        const record = await addParticipantRecord(targetRacha?.id || rachaId, name, newAmount)
+        const record = await addParticipantRecord(
+          targetRacha?.id || rachaId,
+          name,
+          newAmount,
+          effectiveUserId,
+        )
         if (record && record.id) {
           setRachas((prev) =>
             prev.map((r) => {

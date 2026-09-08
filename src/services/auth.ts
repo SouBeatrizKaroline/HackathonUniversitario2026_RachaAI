@@ -79,11 +79,12 @@ export async function requestPasswordReset(
     await pb.collection('users').requestPasswordReset(email.trim())
     return {
       success: true,
-      message: 'Instruções para redefinir a senha foram enviadas para seu e-mail.',
+      message:
+        'Se este e-mail estiver cadastrado, enviamos um link de redefinição para a sua caixa de entrada.',
     }
   } catch (err: any) {
     const errorMsg = String(err?.message || err || '')
-    // When SMTP is not configured in PocketBase, it returns a 500 / Failed to send email error
+    // Quando o SMTP não estiver configurado no servidor ou falhar na conexão de transporte
     if (
       errorMsg.includes('Failed to send') ||
       errorMsg.includes('smtp') ||
@@ -93,12 +94,13 @@ export async function requestPasswordReset(
       return {
         success: false,
         message:
-          'O servidor de envio de e-mails (SMTP) ainda não está configurado nesta instância. Entre em contato com o suporte ou crie uma nova conta.',
+          'O envio de e-mails falhou: as credenciais de SMTP ainda não foram configuradas no servidor Skip Cloud. Preencha as variáveis de ambiente SMTP_HOST, SMTP_PORT, SMTP_USER e SMTP_PASS no painel.',
       }
     }
     return {
       success: false,
-      message: 'Não foi possível solicitar a recuperação. Verifique se o e-mail está correto.',
+      message:
+        'Não foi possível solicitar a recuperação. Verifique se o e-mail informado é válido ou tente novamente mais tarde.',
     }
   }
 }

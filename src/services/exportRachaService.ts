@@ -231,16 +231,36 @@ export async function generateRachaSummaryImage(racha: Racha): Promise<string> {
     // Name
     ctx.fillStyle = '#0F172A'
     ctx.font = 'bold 14px system-ui, -apple-system, sans-serif'
+    const nameWidth = ctx.measureText(p.name).width
     ctx.fillText(p.name, 92, rowY + 16)
+
+    // Badge de perfil verificado
+    if (p.isVerified) {
+      const badgeX = 92 + nameWidth + 8
+      ctx.fillStyle = '#DCFCE7'
+      ctx.beginPath()
+      ctx.roundRect(badgeX, rowY + 4, 76, 16, 8)
+      ctx.fill()
+      ctx.fillStyle = '#15803D'
+      ctx.font = 'bold 9px system-ui, -apple-system, sans-serif'
+      ctx.fillText('✓ VERIFICADO', badgeX + 7, rowY + 15)
+    }
 
     // Paid details / status label
     ctx.font = '11px system-ui, -apple-system, sans-serif'
     if (p.paid) {
       ctx.fillStyle = '#15803D'
-      ctx.fillText(p.paidAt ? `Pago (${p.paidAt})` : 'Confirmado', 260, rowY + 16)
+      const statusText = p.isVerified
+        ? p.paidAt
+          ? `Pago (${p.paidAt}) • Conta Verificada`
+          : 'Confirmado • Conta Verificada'
+        : p.paidAt
+          ? `Pago (${p.paidAt})`
+          : 'Confirmado'
+      ctx.fillText(statusText, 310, rowY + 16)
     } else {
       ctx.fillStyle = '#B45309'
-      ctx.fillText('Aguardando pagamento', 260, rowY + 16)
+      ctx.fillText('Aguardando pagamento', 310, rowY + 16)
     }
 
     // Amount

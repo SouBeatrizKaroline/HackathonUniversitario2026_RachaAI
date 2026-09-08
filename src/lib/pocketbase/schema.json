@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-08T00:25:15.193Z",
+  "generatedAt": "2026-09-08T00:32:02.585Z",
   "collections": [
     {
       "name": "users",
@@ -226,9 +226,19 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "user",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
         }
       ],
-      "indexes": ["CREATE INDEX idx_participantes_racha ON participantes (racha)"]
+      "indexes": [
+        "CREATE INDEX idx_participantes_racha ON participantes (racha)",
+        "CREATE INDEX `idx_participantes_user` ON `participantes` (user)"
+      ]
     },
     {
       "name": "pagamentos",
@@ -292,11 +302,88 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "user",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
         }
       ],
       "indexes": [
         "CREATE INDEX idx_pagamentos_racha ON pagamentos (racha)",
-        "CREATE INDEX idx_pagamentos_created ON pagamentos (created DESC)"
+        "CREATE INDEX idx_pagamentos_created ON pagamentos (created DESC)",
+        "CREATE INDEX `idx_pagamentos_user` ON `pagamentos` (user)"
+      ]
+    },
+    {
+      "name": "convites",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "racha",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "rachas"
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "rachaName",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "perPersonAmount",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "invitedBy",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["enviado", "pendente_smtp", "aceito"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_convites_racha ON convites (racha)",
+        "CREATE INDEX idx_convites_email ON convites (email)"
       ]
     }
   ]

@@ -30,6 +30,7 @@ export interface ParticipantRecord {
   paid: boolean
   paidAt?: string
   txHash?: string
+  user?: string
   created: string
   updated: string
 }
@@ -42,6 +43,7 @@ export interface PagamentoRecord {
   status: 'Confirmado' | 'Pendente'
   txHash?: string
   timestamp: string
+  user?: string
   created: string
   updated: string
 }
@@ -75,6 +77,8 @@ export function mapToRacha(
       paid: Boolean(p.paid),
       paidAt: p.paidAt,
       txHash: p.txHash,
+      user: p.user || undefined,
+      isVerified: Boolean(p.user && p.user !== ''),
     })),
     history: pagamentos.map((h) => ({
       id: h.id,
@@ -83,6 +87,8 @@ export function mapToRacha(
       timestamp: h.timestamp || 'Agora há pouco',
       status: h.status || 'Confirmado',
       txHash: h.txHash,
+      user: h.user || undefined,
+      isVerified: Boolean(h.user && h.user !== ''),
     })),
   }
 }
@@ -186,14 +192,18 @@ export async function createRachaRecord(
   // Create participants records
   const createdParticipants: ParticipantRecord[] = []
   for (const p of data.participants) {
-    const partRec = await pb.collection('participantes').create<ParticipantRecord>({
+    const partData: any = {
       racha: rachaRec.id,
       name: p.name,
       amount: p.amount,
       paid: Boolean(p.paid),
       paidAt: p.paidAt || (p.paid ? 'Agora' : ''),
       txHash: p.txHash || (p.paid ? generateTxHash() : ''),
-    })
+    }
+    if (p.user) {
+      partData.user = p.user
+    }
+    const partRec = await pb.collection('participantes').create<ParticipantRecord>(partData)
     createdParticipants.push(partRec)
   }
 
@@ -201,14 +211,18 @@ export async function createRachaRecord(
   const createdPagamentos: PagamentoRecord[] = []
   for (const p of createdParticipants) {
     if (p.paid) {
-      const pagRec = await pb.collection('pagamentos').create<PagamentoRecord>({
+      const pagData: any = {
         racha: rachaRec.id,
         participantName: p.name,
         amount: p.amount,
         status: 'Confirmado',
         txHash: p.txHash || generateTxHash(),
         timestamp: 'Agora há pouco',
-      })
+      }
+      if (p.user) {
+        pagData.user = p.user
+      }
+      const pagRec = await pb.collection('pagamentos').create<PagamentoRecord>(pagData)
       createdPagamentos.push(pagRec)
     }
   }
@@ -221,27 +235,38 @@ export async function recordParticipantPayment(
   rachaId: string,
   participantId: string,
   customTxHash?: string,
+  userId?: string,
 ): Promise<void> {
   const hash = customTxHash || generateTxHash()
   const now = 'Agora há pouco'
 
   // Update participant
   const part = await pb.collection('participantes').getOne<ParticipantRecord>(participantId)
-  await pb.collection('participantes').update(participantId, {
+  const partUpdates: any = {
     paid: true,
     paidAt: now,
     txHash: hash,
-  })
+  }
+  if (userId) {
+    partUpdates.user = userId
+  }
+
+  await pb.collection('participantes').update(participantId, partUpdates)
 
   // Insert payment history
-  await pb.collection('pagamentos').create({
+  const pagData: any = {
     racha: rachaId,
     participantName: part.name,
     amount: part.amount,
     status: 'Confirmado',
     txHash: hash,
     timestamp: now,
-  })
+  }
+  if (userId || part.user) {
+    pagData.user = userId || part.user
+  }
+
+  await pb.collection('pagamentos').create(pagData)
 }
 
 // Mark participant pending
@@ -274,13 +299,18 @@ export async function addParticipantRecord(
   rachaId: string,
   name: string,
   amount: number,
+  userId?: string,
 ): Promise<ParticipantRecord> {
-  return await pb.collection('participantes').create<ParticipantRecord>({
+  const data: any = {
     racha: rachaId,
     name,
     amount,
     paid: false,
-  })
+  }
+  if (userId) {
+    data.user = userId
+  }
+  return await pb.collection('participantes').create<ParticipantRecord>(data)
 }
 
 // Remove participant

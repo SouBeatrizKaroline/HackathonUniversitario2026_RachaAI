@@ -136,6 +136,7 @@ export default function RachaDetailPage() {
   const effectiveNickname = isAuthenticated && user?.name ? user.name : currentNickname || 'Você'
   const currentUserParticipant = racha.participants.find(
     (p) =>
+      (isAuthenticated && user?.id && p.user === user.id) ||
       p.name.toLowerCase() === effectiveNickname.toLowerCase() ||
       p.name.toLowerCase() === 'você' ||
       (effectiveNickname.toLowerCase().includes(p.name.toLowerCase()) && p.name.length > 2) ||
@@ -164,8 +165,17 @@ export default function RachaDetailPage() {
   // Success payment callback
   const handlePaymentSuccess = (txHash: string) => {
     if (paymentParticipant) {
-      markParticipantPaid(racha.id, paymentParticipant.id, txHash)
-      toast.success('Pagamento registrado! ✅')
+      markParticipantPaid(
+        racha.id,
+        paymentParticipant.id,
+        txHash,
+        isAuthenticated && user?.id ? user.id : undefined,
+      )
+      toast.success(
+        isAuthenticated
+          ? 'Pagamento registrado com selo de conta verificada! ✅'
+          : 'Pagamento registrado! ✅',
+      )
     }
   }
 
@@ -200,8 +210,13 @@ export default function RachaDetailPage() {
 
   // Join racha if not in list
   const handleJoinRacha = () => {
-    const name = currentNickname || 'Você'
-    addParticipantToRacha(racha.id, name)
+    const name = isAuthenticated && user?.name ? user.name : currentNickname || 'Você'
+    addParticipantToRacha(
+      racha.id,
+      name,
+      undefined,
+      isAuthenticated && user?.id ? user.id : undefined,
+    )
     toast.success(`Você entrou no racha como ${name}!`)
   }
 
@@ -258,6 +273,28 @@ export default function RachaDetailPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-2 sm:py-6 space-y-5 relative">
+      {/* Aviso de boas-vindas para participante logado com conta real */}
+      {isAuthenticated && user && (
+        <div className="bg-gradient-to-r from-purple-50 via-white to-emerald-50 border border-purple-200/80 rounded-2xl p-3.5 flex items-center justify-between text-xs shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-full bg-[#7B2FF7] text-white flex items-center justify-center font-bold text-xs shrink-0">
+              ✓
+            </span>
+            <div>
+              <p className="font-bold text-foreground">
+                Conectado como <span className="text-[#7B2FF7]">{user.name}</span> ({user.email})
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Seus pagamentos são automaticamente registrados com o selo de perfil verificado.
+              </p>
+            </div>
+          </div>
+          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] shrink-0 font-bold hidden sm:inline-flex items-center gap-1">
+            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+            Conta verificada
+          </Badge>
+        </div>
+      )}
       {/* 0. LEMBRETE DE FIM DE MÊS (se for racha recorrente) */}
       {racha.isRecurring && <MonthEndReminderBanner recurringRachas={[racha]} />}
 
@@ -451,6 +488,7 @@ export default function RachaDetailPage() {
         <div className="space-y-2">
           {racha.participants.map((p) => {
             const isMe =
+              (isAuthenticated && user?.id && p.user === user.id) ||
               p.name.toLowerCase() === effectiveNickname.toLowerCase() ||
               p.name.toLowerCase() === 'você'
 
@@ -480,6 +518,15 @@ export default function RachaDetailPage() {
                   <div>
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm font-bold text-foreground">{p.name}</span>
+                      {p.isVerified && (
+                        <span
+                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold border border-emerald-300"
+                          title="Conta verificada (usuário registrado no Racha.AI)"
+                        >
+                          <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                          <span>Verificado</span>
+                        </span>
+                      )}
                       {isMe && (
                         <Badge className="bg-[#7B2FF7] hover:bg-[#7B2FF7] text-white text-[9px] px-1.5 py-0 h-4">
                           você
@@ -488,8 +535,13 @@ export default function RachaDetailPage() {
                     </div>
                     <span className="text-[11px] text-muted-foreground">
                       {p.paid ? (
-                        <span className="text-emerald-700 font-semibold">
-                          Pago • {p.paidAt || 'Confirmado'}
+                        <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                          <span>Pago • {p.paidAt || 'Confirmado'}</span>
+                          {p.isVerified && (
+                            <span className="text-[10px] text-emerald-600 font-normal">
+                              (via conta real)
+                            </span>
+                          )}
                         </span>
                       ) : (
                         <span className="text-amber-700 font-medium">Aguardando pagamento</span>
@@ -680,14 +732,30 @@ export default function RachaDetailPage() {
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                     <div>
-                      <span className="font-bold text-foreground">
-                        {h.participantName} pagou {formatCurrencyBRL(h.amount)}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-foreground">
+                          {h.participantName} pagou {formatCurrencyBRL(h.amount)}
+                        </span>
+                        {h.isVerified && (
+                          <span
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold border border-emerald-300"
+                            title="Pagamento realizado por conta verificada"
+                          >
+                            <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
+                            <span>Verificado</span>
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
                         <span>{h.timestamp}</span>
                         {h.txHash && (
                           <span className="font-mono text-purple-700 bg-purple-50 px-1 rounded">
                             {h.txHash}
+                          </span>
+                        )}
+                        {h.isVerified && (
+                          <span className="text-emerald-700 font-medium">
+                            • Usuário autenticado
                           </span>
                         )}
                       </div>
@@ -763,6 +831,7 @@ export default function RachaDetailPage() {
         onOpenChange={setIsShareModalOpen}
         rachaName={racha.name}
         shareCode={racha.shareCode || 'viagem-congresso-7k2m'}
+        rachaId={racha.id}
         perPersonAmount={avgShare}
       />
 
@@ -771,6 +840,7 @@ export default function RachaDetailPage() {
         onOpenChange={setIsCobrancaModalOpen}
         rachaName={racha.name}
         shareCode={racha.shareCode || 'viagem-congresso-7k2m'}
+        rachaId={racha.id}
         participant={cobrancaParticipant}
       />
 

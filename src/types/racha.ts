@@ -7,6 +7,8 @@ export interface Participant {
   paid: boolean
   paidAt?: string
   txHash?: string
+  user?: string
+  isVerified?: boolean
 }
 
 export interface RachaHistoryEntry {
@@ -16,6 +18,8 @@ export interface RachaHistoryEntry {
   timestamp: string
   status: 'Confirmado' | 'Pendente'
   txHash?: string
+  user?: string
+  isVerified?: boolean
 }
 
 export interface Racha {
