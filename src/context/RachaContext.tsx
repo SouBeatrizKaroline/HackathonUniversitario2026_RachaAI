@@ -17,6 +17,7 @@ import {
 } from '@/services/rachas'
 import {
   PaymentNotification,
+  AppNotification,
   CarteiraCompartilhada,
   CarteiraProposta,
   CarteiraMovimento,
@@ -28,6 +29,8 @@ import {
   createCarteiraProposal,
   approveCarteiraProposal,
   DEMO_CARTEIRA,
+  CarteiraPropostaRecord,
+  CarteiraMovimentoRecord,
 } from '@/services/carteiras'
 import { computeFinancialSummary } from '@/services/financialHistory'
 import pb from '@/lib/pocketbase/client'
@@ -76,10 +79,11 @@ interface RachaContextType {
   setIsNicknameModalOpen: (open: boolean) => void
   isWhySolanaModalOpen: boolean
   setIsWhySolanaModalOpen: (open: boolean) => void
-  notifications: PaymentNotification[]
+  notifications: AppNotification[]
   unreadNotificationsCount: number
   markNotificationsAsRead: () => void
   clearNotifications: () => void
+  addAppNotification: (notification: Omit<AppNotification, 'id' | 'timestamp' | 'read'>) => void
   syncLocalStorageRachasToUser: (userId: string) => Promise<number>
   // Carteira Coletiva (República)
   carteiras: CarteiraCompartilhada[]
@@ -125,7 +129,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   })
 
-  const [notifications, setNotifications] = useState<PaymentNotification[]>(() => {
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
     try {
       const stored = localStorage.getItem(NOTIFS_KEY)
       if (stored) {
@@ -137,12 +141,28 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return [
       {
         id: 'notif-demo-1',
+        type: 'pagamento_racha',
         rachaId: 'demo',
         rachaName: 'Viagem para Congresso Universitário',
         participantName: 'Ana Clara',
         amount: 80,
         timestamp: 'Há 10 minutos',
         read: false,
+        link: '/racha/demo',
+      },
+      {
+        id: 'notif-demo-prop',
+        type: 'carteira_proposta_criada',
+        carteiraId: 'demo-carteira-rep',
+        carteiraName: 'Caixa da República',
+        proposalId: 'cprop-1',
+        title: 'Nova proposta no caixa da república',
+        description: 'Conserto emergencial da fechadura eletrônica',
+        actorName: 'Mateus',
+        amount: 140,
+        timestamp: 'Há 3 horas',
+        read: false,
+        link: '/carteira',
       },
     ]
   })
@@ -274,29 +294,28 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [rachas, isLoading])
 
-  // Realtime subscription for incoming payments to notify the creator
+  // Realtime subscription for incoming payments and carteira shared wallet updates
   useEffect(() => {
-    let unsubscribeFn: (() => Promise<void>) | undefined
+    let unsubs: (() => Promise<void>)[] = []
     let cancelled = false
 
+    // 1. Pagamentos de rachas
     pb.collection('pagamentos')
       .subscribe<PagamentoRecord>('*', (e) => {
         if (e.action === 'create' && e.record) {
           const rec = e.record
-          // Find which racha this belongs to
           setRachas((currentRachas) => {
             const targetRacha = currentRachas.find((r) => r.id === rec.racha)
             const rachaName = targetRacha?.name || 'Racha'
 
-            // Add notification
             setNotifications((prev) => {
-              // Avoid duplicate by txHash or id
               if (prev.some((n) => n.id === rec.id || (rec.txHash && n.txHash === rec.txHash))) {
                 return prev
               }
               return [
                 {
                   id: rec.id,
+                  type: 'pagamento_racha',
                   rachaId: rec.racha,
                   rachaName,
                   participantName: rec.participantName,
@@ -304,6 +323,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                   timestamp: rec.timestamp || 'Agora há pouco',
                   txHash: rec.txHash,
                   read: false,
+                  link: `/racha/${rec.racha}`,
                 },
                 ...prev,
               ]
@@ -317,18 +337,136 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (cancelled) {
           fn().catch(() => {})
         } else {
-          unsubscribeFn = fn
+          unsubs.push(fn)
         }
       })
-      .catch(() => {
-        /* subscription fallback */
+      .catch(() => {})
+
+    // 2. Propostas da carteira compartilhada (novas ou atualizadas/aprovadas)
+    pb.collection('carteira_propostas')
+      .subscribe<CarteiraPropostaRecord>('*', (e) => {
+        if (!e.record) return
+        const prop = e.record
+        const currentUserAuthId = pb.authStore.record?.id
+        const currentLocalNickname = (localStorage.getItem(USER_KEY) || '').trim().toLowerCase()
+
+        if (e.action === 'create') {
+          // Quando alguém cria uma proposta, notificar se quem criou NÃO for o usuário atual
+          const isProposerMe =
+            (currentUserAuthId && prop.proposerUser === currentUserAuthId) ||
+            (currentLocalNickname &&
+              prop.proposerName?.trim().toLowerCase() === currentLocalNickname)
+
+          // Se eu não sou o proponente, recebo notificação
+          if (!isProposerMe) {
+            setNotifications((prev) => {
+              const notifId = `prop-created-${prop.id}`
+              if (prev.some((n) => n.id === notifId)) return prev
+
+              return [
+                {
+                  id: notifId,
+                  type: 'carteira_proposta_criada',
+                  carteiraId: prop.carteira,
+                  carteiraName: 'Caixa da República',
+                  proposalId: prop.id,
+                  title: 'Nova proposta no caixa da república',
+                  description: prop.title,
+                  actorName: prop.proposerName,
+                  amount: prop.amount,
+                  timestamp: 'Agora há pouco',
+                  read: false,
+                  link: '/carteira',
+                },
+                ...prev,
+              ]
+            })
+          }
+        } else if (e.action === 'update' && prop.status === 'aprovada') {
+          // Quando a proposta for aprovada (atingiu quórum), notificar todos os moradores
+          setNotifications((prev) => {
+            const notifId = `prop-approved-${prop.id}`
+            if (prev.some((n) => n.id === notifId)) return prev
+
+            return [
+              {
+                id: notifId,
+                type: 'carteira_proposta_aprovada',
+                carteiraId: prop.carteira,
+                carteiraName: 'Caixa da República',
+                proposalId: prop.id,
+                title: 'Proposta aprovada ✅',
+                description: `${prop.title} — Débito efetuado no caixa`,
+                actorName: prop.proposerName,
+                amount: prop.amount,
+                timestamp: 'Agora há pouco',
+                read: false,
+                link: '/carteira',
+              },
+              ...prev,
+            ]
+          })
+        }
       })
+      .then((fn) => {
+        if (cancelled) {
+          fn().catch(() => {})
+        } else {
+          unsubs.push(fn)
+        }
+      })
+      .catch(() => {})
+
+    // 3. Movimentações da carteira (depósitos / contribuições)
+    pb.collection('carteira_movimentos')
+      .subscribe<CarteiraMovimentoRecord>('*', (e) => {
+        if (e.action === 'create' && e.record && e.record.type === 'deposito') {
+          const mov = e.record
+          const currentUserAuthId = pb.authStore.record?.id
+          const currentLocalNickname = (localStorage.getItem(USER_KEY) || '').trim().toLowerCase()
+
+          const isAuthorMe =
+            (currentUserAuthId && mov.user === currentUserAuthId) ||
+            (currentLocalNickname && mov.authorName?.trim().toLowerCase() === currentLocalNickname)
+
+          // Notificar membros quando há um novo depósito (se não foi o próprio usuário que acabou de fazer localmente)
+          if (!isAuthorMe) {
+            setNotifications((prev) => {
+              const notifId = `mov-deposito-${mov.id}`
+              if (prev.some((n) => n.id === notifId)) return prev
+
+              return [
+                {
+                  id: notifId,
+                  type: 'carteira_contribuicao',
+                  carteiraId: mov.carteira,
+                  carteiraName: 'Caixa da República',
+                  title: 'Novo depósito no caixa coletivo',
+                  description: mov.description || 'Contribuição ao fundo de reserva',
+                  actorName: mov.authorName,
+                  amount: mov.amount,
+                  timestamp: 'Agora há pouco',
+                  read: false,
+                  link: '/carteira',
+                },
+                ...prev,
+              ]
+            })
+          }
+        }
+      })
+      .then((fn) => {
+        if (cancelled) {
+          fn().catch(() => {})
+        } else {
+          unsubs.push(fn)
+        }
+      })
+      .catch(() => {})
 
     return () => {
       cancelled = true
-      if (unsubscribeFn) {
-        unsubscribeFn().catch(() => {})
-      }
+      unsubs.forEach((fn) => fn().catch(() => {}))
     }
   }, [])
 
@@ -657,6 +795,21 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setNotifications([])
   }, [])
 
+  const addAppNotification = useCallback(
+    (notification: Omit<AppNotification, 'id' | 'timestamp' | 'read'>) => {
+      setNotifications((prev) => [
+        {
+          id: generateId(),
+          timestamp: 'Agora há pouco',
+          read: false,
+          ...notification,
+        },
+        ...prev,
+      ])
+    },
+    [],
+  )
+
   const unreadNotificationsCount = useMemo(
     () => notifications.filter((n) => !n.read).length,
     [notifications],
@@ -897,11 +1050,17 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const author = authorName?.trim() || user?.name || currentNickname || 'Visitante'
       const userId = user?.id || undefined
 
+      const target = carteiras.find(
+        (c) => c.id === carteiraId || (carteiraId === 'demo' && c.isDemo),
+      )
+      const targetId = target?.id || carteiraId
+      const newBal = (target?.balance || 0) + amount
+
       // Optimistic update
       setCarteiras((prev) =>
         prev.map((c) => {
           if (c.id !== carteiraId && !(carteiraId === 'demo' && c.isDemo)) return c
-          const newBal = c.balance + amount
+          const updatedBal = c.balance + amount
           const newMov: CarteiraMovimento = {
             id: generateId(),
             carteiraId: c.id,
@@ -937,18 +1096,28 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
           return {
             ...c,
-            balance: newBal,
+            balance: updatedBal,
             members: updatedMembers,
             movements: [newMov, ...c.movements],
           }
         }),
       )
 
+      // Notificação in-app informativa sobre o novo depósito para manter o grupo atualizado
+      addAppNotification({
+        type: 'carteira_contribuicao',
+        carteiraId: targetId,
+        carteiraName: target?.name || 'Caixa da República',
+        title: 'Depósito registrado no caixa',
+        description: `${description || 'Contribuição ao caixa'} por ${author}`,
+        actorName: author,
+        amount,
+        newBalance: newBal,
+        link: '/carteira',
+      })
+
       // PocketBase persist
       try {
-        const target = carteiras.find(
-          (c) => c.id === carteiraId || (carteiraId === 'demo' && c.isDemo),
-        )
         if (target && !target.id.startsWith('demo-')) {
           await addCarteiraContribution(target.id, amount, author, description, userId)
         }
@@ -956,7 +1125,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.warn('Erro ao registrar contribuição no PocketBase:', err)
       }
     },
-    [carteiras, currentNickname],
+    [carteiras, currentNickname, addAppNotification],
   )
 
   const proposeCarteiraExpense = useCallback(
@@ -1001,6 +1170,27 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }),
       )
 
+      // No modo demo/local, quando o usuário simula uma proposta com outro morador (ex: Mateus ou Lucas),
+      // ou para garantir que uma proposta recém-criada por outro membro apareça imediatamente
+      // Se quem propõe for outro morador (diferente do usuário ativo atual), adicionamos a notificação
+      const currentActiveName = user?.name || currentNickname || ''
+      const isOtherProposer =
+        currentActiveName && author.toLowerCase() !== currentActiveName.toLowerCase()
+
+      if (isOtherProposer) {
+        addAppNotification({
+          type: 'carteira_proposta_criada',
+          carteiraId: targetId,
+          carteiraName: target?.name || 'Caixa da República',
+          proposalId: tempProp.id,
+          title: 'Nova proposta no caixa da república',
+          description: title.trim(),
+          actorName: author,
+          amount,
+          link: '/carteira',
+        })
+      }
+
       try {
         if (target && !target.id.startsWith('demo-')) {
           await createCarteiraProposal(target.id, title, amount, author, recipient, userId)
@@ -1009,7 +1199,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.warn('Erro ao criar proposta no PocketBase:', err)
       }
     },
-    [carteiras, currentNickname],
+    [carteiras, currentNickname, addAppNotification],
   )
 
   const approveProposal = useCallback(
@@ -1054,6 +1244,8 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (willExecute && (targetCarteira?.balance || 0) < targetProposal.amount) {
         throw new Error('Saldo insuficiente na carteira compartilhada para liquidar esta despesa.')
       }
+
+      let executedNewBalance = (targetCarteira?.balance || 0) - targetProposal.amount
 
       // Optimistic state update
       setCarteiras((prev) =>
@@ -1106,6 +1298,22 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }),
       )
 
+      // Se a proposta foi aprovada (atingiu quórum), disparar notificação local imediatamente
+      if (willExecute) {
+        addAppNotification({
+          type: 'carteira_proposta_aprovada',
+          carteiraId: targetCarteira?.id || carteiraId,
+          carteiraName: targetCarteira?.name || 'Caixa da República',
+          proposalId: targetProposal.id,
+          title: 'Proposta aprovada ✅',
+          description: `${targetProposal.title} — Débito efetuado no caixa`,
+          actorName: author,
+          amount: targetProposal.amount,
+          newBalance: executedNewBalance >= 0 ? executedNewBalance : 0,
+          link: '/carteira',
+        })
+      }
+
       // PocketBase persist
       if (targetCarteira && !targetCarteira.id.startsWith('demo-')) {
         try {
@@ -1119,7 +1327,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       return { executed: willExecute }
     },
-    [carteiras, currentNickname],
+    [carteiras, currentNickname, addAppNotification],
   )
 
   // FINANCIAL SUMMARY
@@ -1154,6 +1362,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       unreadNotificationsCount,
       markNotificationsAsRead,
       clearNotifications,
+      addAppNotification,
       syncLocalStorageRachasToUser,
       carteiras,
       primaryCarteira,
@@ -1188,6 +1397,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       unreadNotificationsCount,
       markNotificationsAsRead,
       clearNotifications,
+      addAppNotification,
       syncLocalStorageRachasToUser,
       carteiras,
       primaryCarteira,

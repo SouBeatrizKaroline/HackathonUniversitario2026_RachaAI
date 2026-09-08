@@ -42,16 +42,38 @@ export interface Racha {
   owner?: string
 }
 
-export interface PaymentNotification {
+export type NotificationType =
+  | 'pagamento_racha'
+  | 'carteira_proposta_criada'
+  | 'carteira_proposta_aprovada'
+  | 'carteira_contribuicao'
+
+export interface AppNotification {
   id: string
-  rachaId: string
-  rachaName: string
-  participantName: string
+  type?: NotificationType
+  // Racha info (se aplicável)
+  rachaId?: string
+  rachaName?: string
+  participantName?: string
+  txHash?: string
+  // Carteira info (se aplicável)
+  carteiraId?: string
+  carteiraName?: string
+  proposalId?: string
+  title?: string
+  description?: string
+  actorName?: string
+  targetUser?: string
+  newBalance?: number
+  // Geral
   amount: number
   timestamp: string
-  txHash?: string
   read: boolean
+  link?: string
 }
+
+// Retrocompatibilidade para componentes que importam PaymentNotification
+export type PaymentNotification = AppNotification
 
 export interface InterpretedRachaData {
   name?: string
