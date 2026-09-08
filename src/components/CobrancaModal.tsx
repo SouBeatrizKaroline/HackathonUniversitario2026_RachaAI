@@ -17,7 +17,9 @@ interface CobrancaModalProps {
   onOpenChange: (open: boolean) => void
   rachaName: string
   shareCode: string
-  participant: Participant | null
+  participant?: Participant | null
+  participantsList?: Participant[]
+  isBatch?: boolean
 }
 
 export const CobrancaModal: React.FC<CobrancaModalProps> = ({
@@ -26,17 +28,36 @@ export const CobrancaModal: React.FC<CobrancaModalProps> = ({
   rachaName,
   shareCode,
   participant,
+  participantsList,
+  isBatch = false,
 }) => {
   const [copied, setCopied] = useState(false)
 
-  if (!participant) return null
+  const activeParticipants = isBatch
+    ? participantsList && participantsList.length > 0
+      ? participantsList
+      : []
+    : participant
+      ? [participant]
+      : []
+
+  if (activeParticipants.length === 0) return null
 
   const realUrl = `${window.location.origin}/racha/${shareCode || 'viagem-congresso-7k2m'}`
 
-  // Friendly reminder message in Brazilian Portuguese mentioning participant's name and amount
-  const friendlyMessage = `Oi ${participant.name}! Passando só para lembrar do nosso racha "${rachaName}".\n\nSua parte é ${formatCurrencyBRL(
-    participant.amount,
-  )}.\n\nVocê pode conferir os detalhes e pagar por aqui:\n${realUrl}\n\nValeu! 🙌`
+  const totalBatchPending = activeParticipants.reduce((acc, curr) => acc + curr.amount, 0)
+  const pendingNames = activeParticipants
+    .map((p) => `${p.name} (${formatCurrencyBRL(p.amount)})`)
+    .join(', ')
+
+  // Friendly reminder message in Brazilian Portuguese
+  const friendlyMessage = isBatch
+    ? `Oi pessoal! ⚠️ O mês está acabando e passando só para lembrar de fechar as contas do racha "${rachaName}".\n\nTotal ainda pendente: ${formatCurrencyBRL(
+        totalBatchPending,
+      )}.\nPendências: ${pendingNames}.\n\nVocê pode conferir os detalhes e pagar por aqui:\n${realUrl}\n\nValeu! 🙌`
+    : `Oi ${activeParticipants[0].name}! Passando só para lembrar do nosso racha "${rachaName}".\n\nSua parte é ${formatCurrencyBRL(
+        activeParticipants[0].amount,
+      )}.\n\nVocê pode conferir os detalhes e pagar por aqui:\n${realUrl}\n\nValeu! 🙌`
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(realUrl)
@@ -76,10 +97,14 @@ export const CobrancaModal: React.FC<CobrancaModalProps> = ({
             </span>
             <div>
               <DialogTitle className="text-xl font-bold tracking-tight text-foreground">
-                Cobrar {participant.name}
+                {isBatch
+                  ? 'Cobrança em massa (fim do mês)'
+                  : `Cobrar ${activeParticipants[0].name}`}
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Lembrete amigável de {formatCurrencyBRL(participant.amount)}
+                {isBatch
+                  ? `${activeParticipants.length} pendentes • Total de ${formatCurrencyBRL(totalBatchPending)}`
+                  : `Lembrete amigável de ${formatCurrencyBRL(activeParticipants[0].amount)}`}
               </DialogDescription>
             </div>
           </div>

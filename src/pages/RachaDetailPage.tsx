@@ -6,9 +6,13 @@ import { SolanaPaymentModal } from '@/components/SolanaPaymentModal'
 import { ShareModal } from '@/components/ShareModal'
 import { CobrancaModal } from '@/components/CobrancaModal'
 import { OrganizerPanelModal } from '@/components/OrganizerPanelModal'
+import { ExportSummaryModal } from '@/components/ExportSummaryModal'
+import { MonthlySummaryModal } from '@/components/MonthlySummaryModal'
+import { MonthEndReminderBanner } from '@/components/MonthEndReminderBanner'
 import { GeminiAssistantPanel } from '@/components/GeminiAssistantPanel'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { generateRepublicMonthlySummary, MonthlySummaryData } from '@/services/geminiService'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +35,8 @@ import {
   Sliders,
   BellRing,
   Repeat,
+  Download,
+  FileImage,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -84,6 +90,12 @@ export default function RachaDetailPage() {
   const [isOrganizerModalOpen, setIsOrganizerModalOpen] = useState(false)
   const [cobrancaParticipant, setCobrancaParticipant] = useState<Participant | null>(null)
   const [isCobrancaModalOpen, setIsCobrancaModalOpen] = useState(false)
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
+
+  // Monthly summary modal (for recurring / república rachas)
+  const [isMonthlySummaryOpen, setIsMonthlySummaryOpen] = useState(false)
+  const [monthlySummaryData, setMonthlySummaryData] = useState<MonthlySummaryData | null>(null)
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false)
 
   if (!racha) {
     return (
@@ -190,6 +202,21 @@ export default function RachaDetailPage() {
     toast.success(`Você entrou no racha como ${name}!`)
   }
 
+  // Trigger Monthly summary generation
+  const handleOpenMonthlySummary = async () => {
+    setIsMonthlySummaryOpen(true)
+    setIsSummaryLoading(true)
+    try {
+      const summary = await generateRepublicMonthlySummary(racha)
+      setMonthlySummaryData(summary)
+    } catch (err) {
+      console.error(err)
+      toast.error('Erro ao gerar resumo da república.')
+    } finally {
+      setIsSummaryLoading(false)
+    }
+  }
+
   // Handle Gemini recalculate suggestion
   const handleGeminiApplyChange = (newCount: number, newTotal: number) => {
     const existing = [...racha.participants]
@@ -228,6 +255,9 @@ export default function RachaDetailPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-2 sm:py-6 space-y-5 relative">
+      {/* 0. LEMBRETE DE FIM DE MÊS (se for racha recorrente) */}
+      {racha.isRecurring && <MonthEndReminderBanner recurringRachas={[racha]} />}
+
       {/* 1. TOP HEADER */}
       <div className="flex items-center justify-between pb-2 border-b border-border">
         <div className="flex items-center gap-2">
@@ -266,6 +296,32 @@ export default function RachaDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Export button */}
+          <Button
+            onClick={() => setIsExportModalOpen(true)}
+            variant="outline"
+            size="sm"
+            className="rounded-xl border-border hover:bg-[#F7F7FB] text-xs font-semibold gap-1.5 h-9"
+            title="Exportar comprovante / resumo do racha"
+          >
+            <Download className="w-3.5 h-3.5 text-foreground" />
+            <span className="hidden sm:inline">Exportar</span>
+          </Button>
+
+          {/* Resumo do mês (se for república recorrente) */}
+          {racha.isRecurring && (
+            <Button
+              onClick={handleOpenMonthlySummary}
+              variant="outline"
+              size="sm"
+              className="rounded-xl border-purple-200 text-[#7B2FF7] bg-purple-50/50 hover:bg-purple-100/70 text-xs font-semibold gap-1.5 h-9"
+              title="Resumo mensal da república gerado por Gemini"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span className="hidden sm:inline">Resumo do mês</span>
+            </Button>
+          )}
+
           {/* Organizer panel button */}
           <Button
             onClick={() => setIsOrganizerModalOpen(true)}
@@ -650,8 +706,8 @@ export default function RachaDetailPage() {
           pagou e quanto ainda falta.&rdquo;
         </p>
 
-        {/* Compartilhar racha button at the bottom of transparency */}
-        <div className="pt-2">
+        {/* Compartilhar & Exportar buttons at the bottom of transparency */}
+        <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
           <Button
             onClick={() => setIsShareModalOpen(true)}
             variant="outline"
@@ -659,6 +715,15 @@ export default function RachaDetailPage() {
           >
             <Share2 className="w-4 h-4 text-[#7B2FF7]" />
             <span>Compartilhar racha</span>
+          </Button>
+
+          <Button
+            onClick={() => setIsExportModalOpen(true)}
+            variant="outline"
+            className="w-full h-10 border-purple-200 text-[#7B2FF7] hover:bg-purple-50 text-xs font-semibold rounded-xl flex items-center justify-center gap-2"
+          >
+            <FileImage className="w-4 h-4 text-[#7B2FF7]" />
+            <span>Exportar resumo (PNG)</span>
           </Button>
         </div>
       </div>
@@ -718,6 +783,19 @@ export default function RachaDetailPage() {
         isOpen={isGeminiSheetOpen}
         onClose={() => setIsGeminiSheetOpen(false)}
         onApplyChange={handleGeminiApplyChange}
+      />
+
+      <ExportSummaryModal
+        open={isExportModalOpen}
+        onOpenChange={setIsExportModalOpen}
+        racha={racha}
+      />
+
+      <MonthlySummaryModal
+        open={isMonthlySummaryOpen}
+        onOpenChange={setIsMonthlySummaryOpen}
+        summary={monthlySummaryData}
+        isLoading={isSummaryLoading}
       />
     </div>
   )

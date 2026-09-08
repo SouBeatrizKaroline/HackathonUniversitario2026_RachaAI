@@ -16,8 +16,12 @@ import {
   Repeat,
   Calendar,
   ChevronRight,
+  FileText,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { MonthEndReminderBanner } from '@/components/MonthEndReminderBanner'
+import { MonthlySummaryModal } from '@/components/MonthlySummaryModal'
+import { generateRepublicMonthlySummary, MonthlySummaryData } from '@/services/geminiService'
 
 const SUGGESTIONS = [
   {
@@ -49,6 +53,11 @@ export default function Dashboard() {
   const { rachas, currentNickname, createNextMonthRecurring } = useRacha()
   const [inputText, setInputText] = useState('')
   const [creatingGroupMonth, setCreatingGroupMonth] = useState<string | null>(null)
+
+  // Monthly summary modal state for recurring república
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false)
+  const [summaryData, setSummaryData] = useState<MonthlySummaryData | null>(null)
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false)
 
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault()
@@ -103,8 +112,25 @@ export default function Dashboard() {
     }
   }
 
+  const handleOpenMonthlySummary = async (targetRacha: Racha, allRachasOfGroup: Racha[]) => {
+    setIsSummaryModalOpen(true)
+    setIsSummaryLoading(true)
+    try {
+      const res = await generateRepublicMonthlySummary(targetRacha, allRachasOfGroup)
+      setSummaryData(res)
+    } catch (err) {
+      console.error(err)
+      toast.error('Erro ao gerar resumo da república.')
+    } finally {
+      setIsSummaryLoading(false)
+    }
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-3 sm:py-6 space-y-6">
+      {/* 0. LEMBRETE AUTOMÁTICO DE FIM DE MÊS (Aviso para pendências) */}
+      <MonthEndReminderBanner recurringRachas={recurringRachas} />
+
       {/* 1. GREETING HEADER */}
       <div className="space-y-1">
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
@@ -233,16 +259,27 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenMonthlySummary(latestInstance, sorted)}
+                        className="text-xs font-semibold rounded-xl h-8 px-2.5 border-purple-300 hover:bg-purple-100/70 text-[#7B2FF7] bg-purple-50/50 gap-1.5"
+                        title="Resumo mensal com Gemini"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Resumo do mês</span>
+                      </Button>
+
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={creatingGroupMonth === groupId}
                         onClick={() => handleGenerateNextMonth(groupId, groupName)}
-                        className="text-xs font-semibold rounded-xl h-8 px-3 border-purple-200 hover:bg-purple-50 text-[#7B2FF7] gap-1"
+                        className="text-xs font-semibold rounded-xl h-8 px-2.5 border-slate-200 hover:bg-slate-50 text-foreground gap-1"
                       >
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>Gerar próximo mês</span>
+                        <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="hidden sm:inline">Próximo mês</span>
                       </Button>
 
                       <Button
@@ -377,6 +414,14 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* MODAL RESUMO DO MÊS */}
+      <MonthlySummaryModal
+        open={isSummaryModalOpen}
+        onOpenChange={setIsSummaryModalOpen}
+        summary={summaryData}
+        isLoading={isSummaryLoading}
+      />
     </div>
   )
 }

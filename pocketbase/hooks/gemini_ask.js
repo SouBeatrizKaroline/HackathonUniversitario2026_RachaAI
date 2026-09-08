@@ -39,7 +39,7 @@ Retorne SEMPRE um JSON válido, sem crases markdown ou formatação externa.`
   const userPrompt = `Dados do racha atual:
 ${JSON.stringify(rachaContext)}
 
-Pergunta do usuário: "${query}"`
+Pergunta ou instrução do usuário: "${query}"`
 
   // 1. Google Gemini direto se houver chave
   if (geminiKey) {

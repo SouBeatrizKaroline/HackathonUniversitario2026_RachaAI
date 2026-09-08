@@ -26,8 +26,10 @@ import {
   Equal,
   ShieldAlert,
   Repeat,
+  BellRing,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { CobrancaModal } from '@/components/CobrancaModal'
 
 interface OrganizerPanelModalProps {
   open: boolean
@@ -59,6 +61,7 @@ export const OrganizerPanelModal: React.FC<OrganizerPanelModalProps> = ({
     racha.recurringGroupName || racha.name.replace(/ - \w+\/\d+$/, ''),
   )
   const [isSaving, setIsSaving] = useState(false)
+  const [isBatchCobrancaOpen, setIsBatchCobrancaOpen] = useState(false)
 
   // Reset form whenever modal opens with latest racha
   useEffect(() => {
@@ -256,9 +259,21 @@ export const OrganizerPanelModal: React.FC<OrganizerPanelModalProps> = ({
           {/* Participantes & Divisão */}
           <div className="space-y-3 pt-2 border-t border-border">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Participantes ({participants.length})
-              </Label>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Participantes ({participants.length})
+                </Label>
+                {participants.filter((p) => !p.paid).length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsBatchCobrancaOpen(true)}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-lg transition-colors"
+                  >
+                    <BellRing className="w-3 h-3 text-amber-600" />
+                    <span>Cobrar todos pendentes</span>
+                  </button>
+                )}
+              </div>
 
               <div className="inline-flex p-0.5 bg-[#F7F7FB] border border-border rounded-xl">
                 <button
@@ -380,6 +395,15 @@ export const OrganizerPanelModal: React.FC<OrganizerPanelModalProps> = ({
             {isSaving ? 'Salvando...' : 'Salvar alterações'}
           </Button>
         </DialogFooter>
+
+        <CobrancaModal
+          open={isBatchCobrancaOpen}
+          onOpenChange={setIsBatchCobrancaOpen}
+          rachaName={name}
+          shareCode={racha.shareCode || racha.id}
+          participantsList={participants.filter((p) => !p.paid)}
+          isBatch={true}
+        />
       </DialogContent>
     </Dialog>
   )
