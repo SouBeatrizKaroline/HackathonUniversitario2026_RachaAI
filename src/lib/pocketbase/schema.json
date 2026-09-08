@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-08T01:02:09.407Z",
+  "generatedAt": "2026-09-08T01:05:11.790Z",
   "collections": [
     {
       "name": "users",
@@ -29,14 +29,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -66,7 +71,14 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["República", "Comida", "Viagem", "Faculdade", "Evento", "Outro"]
+          "selectValues": [
+            "República",
+            "Comida",
+            "Viagem",
+            "Faculdade",
+            "Evento",
+            "Outro"
+          ]
         },
         {
           "name": "totalAmount",
@@ -79,7 +91,10 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["equal", "custom"]
+          "selectValues": [
+            "equal",
+            "custom"
+          ]
         },
         {
           "name": "shareCode",
@@ -110,14 +125,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "isRecurring",
@@ -218,14 +238,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "user",
@@ -275,7 +300,10 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["Confirmado", "Pendente"]
+          "selectValues": [
+            "Confirmado",
+            "Pendente"
+          ]
         },
         {
           "name": "txHash",
@@ -294,14 +322,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "user",
@@ -364,21 +397,30 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["enviado", "pendente_smtp", "aceito"]
+          "selectValues": [
+            "enviado",
+            "pendente_smtp",
+            "aceito"
+          ]
         },
         {
           "name": "created",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -445,14 +487,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "notif_preferences",
@@ -495,7 +542,10 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["admin", "membro"]
+          "selectValues": [
+            "admin",
+            "membro"
+          ]
         },
         {
           "name": "totalContributed",
@@ -515,14 +565,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -553,7 +608,10 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["deposito", "saida"]
+          "selectValues": [
+            "deposito",
+            "saida"
+          ]
         },
         {
           "name": "amount",
@@ -591,14 +649,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -660,7 +723,11 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["pendente", "aprovada", "rejeitada"]
+          "selectValues": [
+            "pendente",
+            "aprovada",
+            "rejeitada"
+          ]
         },
         {
           "name": "requiredApprovals",
@@ -679,14 +746,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -730,17 +802,24 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
-      "indexes": ["CREATE INDEX idx_carteira_aprovacoes_proposta ON carteira_aprovacoes (proposta)"]
+      "indexes": [
+        "CREATE INDEX idx_carteira_aprovacoes_proposta ON carteira_aprovacoes (proposta)"
+      ]
     }
   ]
 }
