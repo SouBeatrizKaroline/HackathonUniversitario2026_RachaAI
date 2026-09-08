@@ -17,6 +17,7 @@ export interface RachaRecord {
   recurringGroupId?: string
   recurringGroupName?: string
   referenceMonth?: string
+  owner?: string
   created: string
   updated: string
 }
@@ -65,6 +66,7 @@ export function mapToRacha(
     recurringGroupId: rachaRec.recurringGroupId,
     recurringGroupName: rachaRec.recurringGroupName,
     referenceMonth: rachaRec.referenceMonth,
+    owner: rachaRec.owner,
     createdAt: rachaRec.created,
     participants: participants.map((p) => ({
       id: p.id,
@@ -178,6 +180,7 @@ export async function createRachaRecord(
     recurringGroupId: data.recurringGroupId || '',
     recurringGroupName: data.recurringGroupName || '',
     referenceMonth: data.referenceMonth || '',
+    owner: data.owner || (pb.authStore.record?.id ? pb.authStore.record.id : ''),
   })
 
   // Create participants records
@@ -299,4 +302,47 @@ export async function updateRachaRecord(
   updates: Partial<RachaRecord>,
 ): Promise<RachaRecord> {
   return await pb.collection('rachas').update<RachaRecord>(rachaId, updates)
+}
+
+// Associate existing unowned rachas to a newly logged-in user
+export async function claimRachasForUser(
+  userId: string,
+  nicknameOrIds: { nickname?: string; rachaIds?: string[] },
+): Promise<number> {
+  let count = 0
+  const { nickname, rachaIds = [] } = nicknameOrIds
+
+  try {
+    for (const rachaId of rachaIds) {
+      if (rachaId === 'demo' || rachaId === 'demo-republica-1') continue
+      try {
+        const existing = await pb.collection('rachas').getOne<RachaRecord>(rachaId)
+        if (!existing.owner || existing.owner === '') {
+          await pb.collection('rachas').update(rachaId, { owner: userId })
+          count++
+        }
+      } catch {
+        /* intentionally ignored */
+      }
+    }
+
+    if (nickname && nickname.trim()) {
+      try {
+        const matching = await pb.collection('rachas').getFullList<RachaRecord>({
+          filter: `creatorNickname = "${nickname.trim()}" && (owner = null || owner = "")`,
+        })
+        for (const item of matching) {
+          if (item.isDemo) continue
+          await pb.collection('rachas').update(item.id, { owner: userId })
+          count++
+        }
+      } catch {
+        /* intentionally ignored */
+      }
+    }
+  } catch (err) {
+    console.warn('Erro ao associar rachas ao usuário:', err)
+  }
+
+  return count
 }

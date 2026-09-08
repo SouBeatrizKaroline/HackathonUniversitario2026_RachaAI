@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { AuthProvider } from '@/context/AuthContext'
 import { RachaProvider } from '@/context/RachaContext'
 
 import Layout from './components/Layout'
@@ -12,27 +13,35 @@ import AssistantPage from './pages/AssistantPage'
 import CreateRachaPage from './pages/CreateRachaPage'
 import RachaDetailPage from './pages/RachaDetailPage'
 import RachasListPage from './pages/RachasListPage'
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import NotFound from './pages/NotFound'
 
 const App = () => (
   <BrowserRouter>
     <TooltipProvider>
-      <RachaProvider>
-        <Toaster />
-        <Sonner position="top-center" richColors />
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<Index />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/assistente" element={<AssistantPage />} />
-            <Route path="/racha/novo" element={<CreateRachaPage />} />
-            <Route path="/racha/:id" element={<RachaDetailPage />} />
-            <Route path="/racha/demo" element={<RachaDetailPage />} />
-            <Route path="/rachas" element={<RachasListPage />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </RachaProvider>
+      <AuthProvider>
+        <RachaProvider>
+          <Toaster />
+          <Sonner position="top-center" richColors />
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<Index />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/assistente" element={<AssistantPage />} />
+              <Route path="/racha/novo" element={<CreateRachaPage />} />
+              <Route path="/racha/:id" element={<RachaDetailPage />} />
+              <Route path="/racha/demo" element={<RachaDetailPage />} />
+              <Route path="/rachas" element={<RachasListPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/cadastro" element={<RegisterPage />} />
+              <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </RachaProvider>
+      </AuthProvider>
     </TooltipProvider>
   </BrowserRouter>
 )

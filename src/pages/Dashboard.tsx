@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useRacha } from '@/context/RachaContext'
+import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrencyBRL, Racha } from '@/types/racha'
@@ -17,6 +18,9 @@ import {
   Calendar,
   ChevronRight,
   FileText,
+  UserCheck,
+  UserPlus,
+  ShieldAlert,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { MonthEndReminderBanner } from '@/components/MonthEndReminderBanner'
@@ -50,6 +54,7 @@ const SUGGESTIONS = [
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { user, isAuthenticated } = useAuth()
   const { rachas, currentNickname, createNextMonthRecurring } = useRacha()
   const [inputText, setInputText] = useState('')
   const [creatingGroupMonth, setCreatingGroupMonth] = useState<string | null>(null)
@@ -133,13 +138,55 @@ export default function Dashboard() {
 
       {/* 1. GREETING HEADER */}
       <div className="space-y-1">
-        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
-          Olá{currentNickname ? `, ${currentNickname}` : ''}! 👋 O que vamos rachar hoje?
-        </h1>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
+            Olá{user?.name ? `, ${user.name}` : currentNickname ? `, ${currentNickname}` : ''}! 👋 O
+            que vamos rachar hoje?
+          </h1>
+          {isAuthenticated ? (
+            <Badge className="bg-purple-100 text-[#7B2FF7] hover:bg-purple-100 text-xs font-semibold gap-1">
+              <UserCheck className="w-3.5 h-3.5" />
+              Conta ativa
+            </Badge>
+          ) : (
+            <Link to="/cadastro">
+              <Badge
+                variant="outline"
+                className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-semibold gap-1 cursor-pointer transition-colors"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                Modo Demo • Criar conta para salvar
+              </Badge>
+            </Link>
+          )}
+        </div>
         <p className="text-xs sm:text-sm text-muted-foreground">
           Descreva o que precisa dividir ou escolha uma sugestão rápida abaixo.
         </p>
       </div>
+
+      {/* Demo notice for visitors */}
+      {!isAuthenticated && (
+        <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-3.5 text-xs text-amber-900 flex items-center justify-between gap-3 shadow-subtle">
+          <div className="flex items-center gap-2.5">
+            <span className="text-lg">💡</span>
+            <div>
+              <p className="font-bold">Você está navegando como visitante (demonstração).</p>
+              <p className="text-[11px] text-amber-800">
+                Os dados são salvos localmente. Crie uma conta real para acessar de qualquer
+                aparelho e proteger seus dados.
+              </p>
+            </div>
+          </div>
+          <Button
+            asChild
+            size="sm"
+            className="bg-[#7B2FF7] hover:bg-[#6A23E0] text-white text-xs font-bold rounded-xl h-8 px-3 shrink-0"
+          >
+            <Link to="/cadastro">Criar conta</Link>
+          </Button>
+        </div>
+      )}
 
       {/* 2. CHAT INPUT CARD (Primary interaction) */}
       <div className="bg-white rounded-2xl border border-border shadow-elevation p-4 sm:p-5 transition-all">

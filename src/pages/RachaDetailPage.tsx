@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useRacha } from '@/context/RachaContext'
+import { useAuth } from '@/context/AuthContext'
 import { formatCurrencyBRL, Participant } from '@/types/racha'
 import { SolanaPaymentModal } from '@/components/SolanaPaymentModal'
 import { ShareModal } from '@/components/ShareModal'
@@ -56,6 +57,7 @@ export default function RachaDetailPage() {
     currentNickname,
     setIsNicknameModalOpen,
   } = useRacha()
+  const { user, isAuthenticated } = useAuth()
 
   const rachaId = id || 'demo'
   const [remoteLoading, setRemoteLoading] = useState(false)
@@ -131,12 +133,13 @@ export default function RachaDetailPage() {
   const percent = total > 0 ? Math.min(100, Math.round((paidAmount / total) * 100)) : 0
 
   // Match current user
-  const effectiveNickname = currentNickname || 'Você'
+  const effectiveNickname = isAuthenticated && user?.name ? user.name : currentNickname || 'Você'
   const currentUserParticipant = racha.participants.find(
     (p) =>
       p.name.toLowerCase() === effectiveNickname.toLowerCase() ||
       p.name.toLowerCase() === 'você' ||
-      (currentNickname === '' && p.name.toLowerCase() === 'você'),
+      (effectiveNickname.toLowerCase().includes(p.name.toLowerCase()) && p.name.length > 2) ||
+      (currentNickname === '' && !isAuthenticated && p.name.toLowerCase() === 'você'),
   )
 
   const isCurrentUserParticipant = Boolean(currentUserParticipant)

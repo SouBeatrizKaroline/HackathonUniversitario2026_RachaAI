@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useRacha } from '@/context/RachaContext'
+import { useAuth } from '@/context/AuthContext'
 import {
   RachaCategory,
   CATEGORIES,
@@ -42,6 +43,7 @@ export default function CreateRachaPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { createRacha, currentNickname } = useRacha()
+  const { user, isAuthenticated } = useAuth()
 
   const prefilled = (location.state as { prefilled?: InterpretedRachaData })?.prefilled
 
@@ -65,11 +67,11 @@ export default function CreateRachaPage() {
         paid: Boolean(p.paid),
       }))
     }
-    // Default 3 participants
-    const userMe = currentNickname || 'Você'
+    // Default 2 participants
+    const userMe = isAuthenticated && user?.name ? user.name : currentNickname || 'Você'
     return [
       { id: generateId(), name: userMe, amount: 0, paid: false },
-      { id: generateId(), name: 'Pessoa 2', amount: 0, paid: false },
+      { id: generateId(), name: 'Amigo 1', amount: 0, paid: false },
     ]
   })
 
@@ -215,7 +217,8 @@ export default function CreateRachaPage() {
         recurringGroupId: recGroupId,
         recurringGroupName: isRecurring ? recurringGroupName.trim() || name.trim() : undefined,
         referenceMonth: isRecurring ? curMonth : undefined,
-        creatorNickname: currentNickname || 'Você',
+        creatorNickname: isAuthenticated && user?.name ? user.name : currentNickname || 'Você',
+        owner: user?.id || undefined,
         participants: participants.map((p) => ({
           id: p.id,
           name: p.name.trim() || 'Sem nome',

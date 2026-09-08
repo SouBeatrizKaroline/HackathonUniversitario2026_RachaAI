@@ -1,13 +1,24 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useRacha } from '@/context/RachaContext'
+import { useAuth } from '@/context/AuthContext'
 import { formatCurrencyBRL, Racha, RachaCategory, CATEGORIES } from '@/types/racha'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Search, Filter, Users, ChevronRight, TrendingUp, RotateCcw } from 'lucide-react'
+import {
+  Plus,
+  Search,
+  Filter,
+  Users,
+  ChevronRight,
+  TrendingUp,
+  RotateCcw,
+  UserPlus,
+} from 'lucide-react'
 
 export default function RachasListPage() {
+  const { isAuthenticated } = useAuth()
   const { rachas, resetDemoRacha } = useRacha()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas')
@@ -45,23 +56,48 @@ export default function RachasListPage() {
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Meus rachas
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+              Meus rachas
+            </h1>
+            {!isAuthenticated && (
+              <Badge
+                variant="outline"
+                className="border-amber-400 bg-amber-50 text-amber-800 text-[10px]"
+              >
+                Modo Demo
+              </Badge>
+            )}
+          </div>
           <p className="text-xs sm:text-sm text-muted-foreground">
             Acompanhe arrecadações e histórico de pagamentos
           </p>
         </div>
 
-        <Button
-          asChild
-          className="hidden sm:inline-flex bg-[#7B2FF7] hover:bg-[#6A23E0] text-white text-xs font-semibold rounded-xl h-10 px-4 shadow-sm"
-        >
-          <Link to="/assistente" className="flex items-center gap-1.5">
-            <Plus className="w-4 h-4" />
-            <span>Novo racha</span>
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {!isAuthenticated && (
+            <Button
+              asChild
+              variant="outline"
+              className="text-xs border-purple-200 text-[#7B2FF7] hover:bg-purple-50 rounded-xl h-10 px-3"
+            >
+              <Link to="/cadastro" className="flex items-center gap-1.5">
+                <UserPlus className="w-4 h-4" />
+                <span className="hidden sm:inline">Criar conta</span>
+              </Link>
+            </Button>
+          )}
+
+          <Button
+            asChild
+            className="hidden sm:inline-flex bg-[#7B2FF7] hover:bg-[#6A23E0] text-white text-xs font-semibold rounded-xl h-10 px-4 shadow-sm"
+          >
+            <Link to="/assistente" className="flex items-center gap-1.5">
+              <Plus className="w-4 h-4" />
+              <span>Novo racha</span>
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Search and Category Filter */}

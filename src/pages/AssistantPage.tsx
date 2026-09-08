@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useRacha } from '@/context/RachaContext'
+import { useAuth } from '@/context/AuthContext'
 import { parseRachaWithGemini } from '@/services/geminiService'
 import { InterpretedRachaData, formatCurrencyBRL, CATEGORIES } from '@/types/racha'
 import { Button } from '@/components/ui/button'
@@ -48,6 +49,7 @@ export default function AssistantPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { currentNickname } = useRacha()
+  const { user, isAuthenticated } = useAuth()
 
   const [messages, setMessages] = useState<Message[]>([
     {

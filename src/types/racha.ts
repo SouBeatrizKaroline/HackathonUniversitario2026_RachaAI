@@ -35,6 +35,7 @@ export interface Racha {
   recurringGroupId?: string
   recurringGroupName?: string
   referenceMonth?: string
+  owner?: string
 }
 
 export interface PaymentNotification {

@@ -12,6 +12,7 @@ import {
   removeParticipantRecord,
   updateParticipantRecord,
   updateRachaRecord,
+  claimRachasForUser,
   PagamentoRecord,
 } from '@/services/rachas'
 import { PaymentNotification } from '@/types/racha'
@@ -55,6 +56,7 @@ interface RachaContextType {
   unreadNotificationsCount: number
   markNotificationsAsRead: () => void
   clearNotifications: () => void
+  syncLocalStorageRachasToUser: (userId: string) => Promise<number>
 }
 
 const STORAGE_KEY = 'rachaai_rachas'
@@ -268,6 +270,33 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
   }, [])
+
+  // Method to sync and adopt local/unowned rachas when user signs in
+  const syncLocalStorageRachasToUser = useCallback(
+    async (userId: string): Promise<number> => {
+      try {
+        const localRachaIds = rachas
+          .filter((r) => !r.isDemo && r.id !== 'demo' && (!r.owner || r.owner === ''))
+          .map((r) => r.id)
+
+        const claimedCount = await claimRachasForUser(userId, {
+          nickname: currentNickname,
+          rachaIds: localRachaIds,
+        })
+
+        if (claimedCount > 0) {
+          // Refresh rachas
+          const refreshed = await fetchAllRachas()
+          setRachas(refreshed)
+        }
+        return claimedCount
+      } catch (err) {
+        console.warn('Erro ao sincronizar rachas locais:', err)
+        return 0
+      }
+    },
+    [rachas, currentNickname],
+  )
 
   const setCurrentNickname = useCallback((name: string) => {
     const trimmed = name.trim()
@@ -710,6 +739,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         recurringGroupName: groupName,
         referenceMonth,
         creatorNickname: template.creatorNickname || currentNickname || 'Você',
+        owner: pb.authStore.record?.id || template.owner || undefined,
         description: `Mensalidade recorrente de ${referenceMonth} da ${groupName}`,
         participants: template.participants.map((p) => ({
           id: generateId(),
@@ -804,6 +834,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       unreadNotificationsCount,
       markNotificationsAsRead,
       clearNotifications,
+      syncLocalStorageRachasToUser,
     }),
     [
       rachas,
@@ -831,6 +862,7 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       unreadNotificationsCount,
       markNotificationsAsRead,
       clearNotifications,
+      syncLocalStorageRachasToUser,
     ],
   )
 

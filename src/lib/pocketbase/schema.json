@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-08T00:19:16.567Z",
+  "generatedAt": "2026-09-08T00:25:15.193Z",
   "collections": [
     {
       "name": "users",
@@ -51,8 +51,8 @@
         "list": "",
         "view": "",
         "create": "",
-        "update": "",
-        "delete": ""
+        "update": "@request.auth.id != '' && owner = @request.auth.id || owner = null || isDemo = true",
+        "delete": "@request.auth.id != '' && owner = @request.auth.id || owner = null"
       },
       "fields": [
         {
@@ -148,13 +148,21 @@
           "type": "text",
           "required": false,
           "system": false
+        },
+        {
+          "name": "owner",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
         }
       ],
       "indexes": [
         "CREATE INDEX idx_rachas_shareCode ON rachas (shareCode)",
         "CREATE INDEX idx_rachas_created ON rachas (created DESC)",
         "CREATE INDEX `idx_rachas_recurring` ON `rachas` (recurringGroupId)",
-        "CREATE INDEX `idx_rachas_month` ON `rachas` (referenceMonth)"
+        "CREATE INDEX `idx_rachas_month` ON `rachas` (referenceMonth)",
+        "CREATE INDEX `idx_rachas_owner` ON `rachas` (owner)"
       ]
     },
     {

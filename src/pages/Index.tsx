@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useRacha } from '@/context/RachaContext'
+import { useAuth } from '@/context/AuthContext'
 import {
   Sparkles,
   Zap,
@@ -15,15 +16,29 @@ import {
   ChevronDown,
   CheckCircle2,
   Users,
+  LogIn,
+  UserPlus,
+  PlayCircle,
 } from 'lucide-react'
 
 export default function Index() {
   const navigate = useNavigate()
   const { setIsWhySolanaModalOpen } = useRacha()
+  const { isAuthenticated, user, setDemoMode } = useAuth()
 
   const scrollToHow = () => {
     const el = document.getElementById('como-funciona')
     el?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const handleOpenDemo = () => {
+    setDemoMode(true)
+    navigate('/racha/demo')
+  }
+
+  const handleOpenDemoDashboard = () => {
+    setDemoMode(true)
+    navigate('/dashboard')
   }
 
   return (
@@ -43,17 +58,35 @@ export default function Index() {
         <div className="flex items-center gap-2 sm:gap-4">
           <button
             onClick={() => setIsWhySolanaModalOpen(true)}
-            className="text-xs sm:text-sm font-semibold text-muted-foreground hover:text-[#7B2FF7] transition-colors px-2 py-1"
+            className="hidden sm:inline text-xs sm:text-sm font-semibold text-muted-foreground hover:text-[#7B2FF7] transition-colors px-2 py-1"
           >
             Por que Solana?
           </button>
-          <Button
-            asChild
-            variant="outline"
-            className="text-xs sm:text-sm font-semibold rounded-xl border-[#7B2FF7]/30 text-[#7B2FF7] hover:bg-purple-50 h-9"
-          >
-            <Link to="/dashboard">Entrar no App</Link>
-          </Button>
+
+          {isAuthenticated ? (
+            <Button
+              asChild
+              className="text-xs sm:text-sm font-bold bg-[#7B2FF7] hover:bg-[#6A23E0] text-white rounded-xl h-9 px-4"
+            >
+              <Link to="/dashboard">Ir para o App ({user?.name || 'Conta'})</Link>
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button
+                asChild
+                variant="ghost"
+                className="text-xs sm:text-sm font-semibold text-foreground hover:text-[#7B2FF7] h-9 px-3"
+              >
+                <Link to="/login">Entrar</Link>
+              </Button>
+              <Button
+                asChild
+                className="text-xs sm:text-sm font-bold bg-[#7B2FF7] hover:bg-[#6A23E0] text-white rounded-xl h-9 px-4 shadow-sm"
+              >
+                <Link to="/cadastro">Criar conta</Link>
+              </Button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -88,24 +121,41 @@ export default function Index() {
             organiza o resto.
           </p>
 
-          {/* Actions */}
+          {/* Actions - Clear Dual Paths */}
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto mb-6">
-            <Button
-              asChild
-              className="w-full sm:w-auto h-12 px-8 bg-[#7B2FF7] hover:bg-[#6A23E0] text-white text-base font-bold rounded-xl shadow-lg shadow-purple-500/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <Link to="/assistente" className="flex items-center justify-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-300" />
-                Criar um racha
-              </Link>
-            </Button>
+            {isAuthenticated ? (
+              <Button
+                asChild
+                className="w-full sm:w-auto h-12 px-8 bg-[#7B2FF7] hover:bg-[#6A23E0] text-white text-base font-bold rounded-xl shadow-lg shadow-purple-500/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Link to="/assistente" className="flex items-center justify-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-300" />
+                  Criar um racha
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                asChild
+                className="w-full sm:w-auto h-12 px-8 bg-[#7B2FF7] hover:bg-[#6A23E0] text-white text-base font-bold rounded-xl shadow-lg shadow-purple-500/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Link to="/cadastro" className="flex items-center justify-center gap-2">
+                  <UserPlus className="w-5 h-5 text-amber-300" />
+                  Criar conta grátis
+                </Link>
+              </Button>
+            )}
 
             <Button
-              asChild
+              type="button"
               variant="outline"
-              className="w-full sm:w-auto h-12 px-8 bg-white hover:bg-slate-50 text-foreground text-base font-semibold rounded-xl border-border shadow-xs transition-all"
+              onClick={handleOpenDemo}
+              className="w-full sm:w-auto h-12 px-8 bg-white hover:bg-slate-50 text-foreground text-base font-semibold rounded-xl border-border shadow-xs transition-all flex items-center justify-center gap-2"
             >
-              <Link to="/racha/demo">Ver demonstração</Link>
+              <PlayCircle className="w-5 h-5 text-[#7B2FF7]" />
+              <span>Ver demonstração</span>
+              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-[10px] ml-1">
+                Demo
+              </Badge>
             </Button>
           </div>
 
@@ -409,12 +459,22 @@ export default function Index() {
           <p className="text-base sm:text-lg text-purple-100 max-w-xl mx-auto mb-8 font-medium">
             Você não precisa entender blockchain. Só precisa saber o que quer rachar.
           </p>
-          <Button
-            asChild
-            className="h-12 px-9 bg-white text-[#7B2FF7] hover:bg-slate-100 text-base font-bold rounded-xl shadow-xl transition-all hover:scale-105 active:scale-95"
-          >
-            <Link to="/assistente">Criar um racha</Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button
+              asChild
+              className="h-12 px-8 bg-white text-[#7B2FF7] hover:bg-slate-100 text-base font-bold rounded-xl shadow-xl transition-all hover:scale-105 active:scale-95"
+            >
+              <Link to="/cadastro">Criar minha conta</Link>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleOpenDemoDashboard}
+              className="h-12 px-6 bg-transparent border-white/60 text-white hover:bg-white/10 text-base font-semibold rounded-xl transition-all"
+            >
+              Continuar como visitante
+            </Button>
+          </div>
         </div>
       </section>
 
