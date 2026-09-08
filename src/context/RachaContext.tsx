@@ -10,7 +10,12 @@ import {
   recordParticipantPending,
   addParticipantRecord,
   removeParticipantRecord,
+  updateParticipantRecord,
+  updateRachaRecord,
+  PagamentoRecord,
 } from '@/services/rachas'
+import { PaymentNotification } from '@/types/racha'
+import pb from '@/lib/pocketbase/client'
 
 interface RachaContextType {
   rachas: Racha[]
@@ -20,21 +25,41 @@ interface RachaContextType {
   getRacha: (id: string) => Racha | undefined
   fetchRemoteRacha: (idOrCode: string) => Promise<Racha | null>
   createRacha: (data: Omit<Racha, 'id' | 'createdAt' | 'history'>) => Promise<Racha>
-  updateRacha: (id: string, updates: Partial<Racha>) => void
+  updateRacha: (id: string, updates: Partial<Racha>) => Promise<void>
   deleteRacha: (id: string) => void
   markParticipantPaid: (rachaId: string, participantId: string, txHash?: string) => Promise<void>
   markParticipantPending: (rachaId: string, participantId: string) => Promise<void>
   addParticipantToRacha: (rachaId: string, name: string, amount?: number) => Promise<void>
   removeParticipantFromRacha: (rachaId: string, participantId: string) => Promise<void>
+  updateParticipant: (
+    rachaId: string,
+    participantId: string,
+    updates: Partial<Participant>,
+  ) => Promise<void>
+  saveOrganizerChanges: (
+    rachaId: string,
+    changes: {
+      name: string
+      totalAmount: number
+      splitType: 'equal' | 'custom'
+      participants: Participant[]
+    },
+  ) => Promise<void>
+  createNextMonthRecurring: (recurringGroupId: string) => Promise<Racha | null>
   resetDemoRacha: () => void
   isNicknameModalOpen: boolean
   setIsNicknameModalOpen: (open: boolean) => void
   isWhySolanaModalOpen: boolean
   setIsWhySolanaModalOpen: (open: boolean) => void
+  notifications: PaymentNotification[]
+  unreadNotificationsCount: number
+  markNotificationsAsRead: () => void
+  clearNotifications: () => void
 }
 
 const STORAGE_KEY = 'rachaai_rachas'
 const USER_KEY = 'rachaai_nickname'
+const NOTIFS_KEY = 'rachaai_notifications'
 
 const RachaContext = createContext<RachaContextType | undefined>(undefined)
 
@@ -49,6 +74,37 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return ''
     }
   })
+
+  const [notifications, setNotifications] = useState<PaymentNotification[]>(() => {
+    try {
+      const stored = localStorage.getItem(NOTIFS_KEY)
+      if (stored) {
+        return JSON.parse(stored)
+      }
+    } catch {
+      /* ignore */
+    }
+    return [
+      {
+        id: 'notif-demo-1',
+        rachaId: 'demo',
+        rachaName: 'Viagem para Congresso Universitário',
+        participantName: 'Ana Clara',
+        amount: 80,
+        timestamp: 'Há 10 minutos',
+        read: false,
+      },
+    ]
+  })
+
+  // Sync notifications to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(NOTIFS_KEY, JSON.stringify(notifications))
+    } catch {
+      /* ignore */
+    }
+  }, [notifications])
 
   const [isNicknameModalOpen, setIsNicknameModalOpen] = useState(false)
   const [isWhySolanaModalOpen, setIsWhySolanaModalOpen] = useState(false)
@@ -105,6 +161,64 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
   }, [rachas, isLoading])
+
+  // Realtime subscription for incoming payments to notify the creator
+  useEffect(() => {
+    let unsubscribeFn: (() => Promise<void>) | undefined
+    let cancelled = false
+
+    pb.collection('pagamentos')
+      .subscribe<PagamentoRecord>('*', (e) => {
+        if (e.action === 'create' && e.record) {
+          const rec = e.record
+          // Find which racha this belongs to
+          setRachas((currentRachas) => {
+            const targetRacha = currentRachas.find((r) => r.id === rec.racha)
+            const rachaName = targetRacha?.name || 'Racha'
+
+            // Add notification
+            setNotifications((prev) => {
+              // Avoid duplicate by txHash or id
+              if (prev.some((n) => n.id === rec.id || (rec.txHash && n.txHash === rec.txHash))) {
+                return prev
+              }
+              return [
+                {
+                  id: rec.id,
+                  rachaId: rec.racha,
+                  rachaName,
+                  participantName: rec.participantName,
+                  amount: rec.amount,
+                  timestamp: rec.timestamp || 'Agora há pouco',
+                  txHash: rec.txHash,
+                  read: false,
+                },
+                ...prev,
+              ]
+            })
+
+            return currentRachas
+          })
+        }
+      })
+      .then((fn) => {
+        if (cancelled) {
+          fn().catch(() => {})
+        } else {
+          unsubscribeFn = fn
+        }
+      })
+      .catch(() => {
+        /* subscription fallback */
+      })
+
+    return () => {
+      cancelled = true
+      if (unsubscribeFn) {
+        unsubscribeFn().catch(() => {})
+      }
+    }
+  }, [])
 
   const setCurrentNickname = useCallback((name: string) => {
     const trimmed = name.trim()
@@ -192,23 +306,135 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [],
   )
 
-  const updateRacha = useCallback((id: string, updates: Partial<Racha>) => {
+  const updateRacha = useCallback(async (id: string, updates: Partial<Racha>) => {
     setRachas((prev) => prev.map((racha) => (racha.id === id ? { ...racha, ...updates } : racha)))
+    try {
+      await updateRachaRecord(id, updates as any)
+    } catch (err) {
+      console.warn('Erro ao atualizar racha no PocketBase:', err)
+    }
   }, [])
 
   const deleteRacha = useCallback((id: string) => {
     setRachas((prev) => prev.filter((racha) => racha.id !== id))
+    pb.collection('rachas').delete(id).catch(() => {})
   }, [])
+
+  const updateParticipant = useCallback(
+    async (rachaId: string, participantId: string, updates: Partial<Participant>) => {
+      setRachas((prev) =>
+        prev.map((r) => {
+          if (r.id !== rachaId && !(rachaId === 'demo' && r.isDemo)) return r
+          return {
+            ...r,
+            participants: r.participants.map((p) =>
+              p.id === participantId ? { ...p, ...updates } : p,
+            ),
+          }
+        }),
+      )
+
+      try {
+        await updateParticipantRecord(participantId, updates)
+      } catch (err) {
+        console.warn('Erro ao atualizar participante no PocketBase:', err)
+      }
+    },
+    [],
+  )
+
+  const saveOrganizerChanges = useCallback(
+    async (
+      rachaId: string,
+      changes: {
+        name: string
+        totalAmount: number
+        splitType: 'equal' | 'custom'
+        participants: Participant[]
+      },
+    ) => {
+      const target = rachas.find((r) => r.id === rachaId || (rachaId === 'demo' && r.isDemo))
+      const isDemo = rachaId === 'demo' || target?.isDemo
+
+      // Optimistic update
+      setRachas((prev) =>
+        prev.map((r) => {
+          if (r.id !== rachaId && !(rachaId === 'demo' && r.isDemo)) return r
+          return {
+            ...r,
+            name: changes.name,
+            totalAmount: changes.totalAmount,
+            splitType: changes.splitType,
+            participants: changes.participants,
+          }
+        }),
+      )
+
+      if (isDemo) return
+
+      try {
+        // 1. Update racha metadata
+        await updateRachaRecord(rachaId, {
+          name: changes.name,
+          totalAmount: changes.totalAmount,
+          splitType: changes.splitType,
+        })
+
+        // 2. Sync participants
+        const existingParticipants = target?.participants || []
+        const currentIds = new Set(changes.participants.map((p) => p.id))
+
+        // Deleted participants
+        for (const ep of existingParticipants) {
+          if (!currentIds.has(ep.id)) {
+            await removeParticipantRecord(ep.id).catch(() => {})
+          }
+        }
+
+        // Updated or New participants
+        const updatedParticipantsList: Participant[] = []
+        for (const p of changes.participants) {
+          const isExisting = existingParticipants.some((ep) => ep.id === p.id)
+          if (isExisting) {
+            await updateParticipantRecord(p.id, {
+              name: p.name,
+              amount: p.amount,
+            }).catch(() => {})
+            updatedParticipantsList.push(p)
+          } else {
+            // New participant added during editing
+            const created = await addParticipantRecord(rachaId, p.name, p.amount)
+            updatedParticipantsList.push({
+              ...p,
+              id: created.id,
+            })
+          }
+        }
+
+        // Re-sync IDs if new ones were generated
+        setRachas((prev) =>
+          prev.map((r) => (r.id === rachaId ? { ...r, participants: updatedParticipantsList } : r)),
+        )
+      } catch (err) {
+        console.error('Erro ao salvar alterações do organizador no PocketBase:', err)
+      }
+    },
+    [rachas],
+  )
 
   const markParticipantPaid = useCallback(
     async (rachaId: string, participantId: string, customTxHash?: string) => {
       const hash = customTxHash || generateTxHash()
+      let paidPName = ''
+      let paidAmount = 0
+      let targetRachaName = ''
 
       // Optimistic update
       setRachas((prev) =>
         prev.map((r) => {
           if (r.id !== rachaId && !(rachaId === 'demo' && r.isDemo)) return r
 
+          targetRachaName = r.name
           let targetParticipant: Participant | undefined
           const updatedParticipants = r.participants.map((p) => {
             if (p.id === participantId || p.name.toLowerCase() === participantId.toLowerCase()) {
@@ -219,6 +445,8 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 txHash: hash,
               }
               targetParticipant = updatedP
+              paidPName = p.name
+              paidAmount = p.amount
               return updatedP
             }
             return p
@@ -243,6 +471,23 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }),
       )
 
+      // Add notification for creator
+      if (paidPName) {
+        setNotifications((prev) => [
+          {
+            id: generateId(),
+            rachaId,
+            rachaName: targetRachaName || 'Racha',
+            participantName: paidPName,
+            amount: paidAmount,
+            timestamp: 'Agora há pouco',
+            txHash: hash,
+            read: false,
+          },
+          ...prev,
+        ])
+      }
+
       // Sync backend
       try {
         await recordParticipantPayment(rachaId, participantId, hash)
@@ -251,6 +496,19 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     },
     [],
+  )
+
+  const markNotificationsAsRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+  }, [])
+
+  const clearNotifications = useCallback(() => {
+    setNotifications([])
+  }, [])
+
+  const unreadNotificationsCount = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications],
   )
 
   const markParticipantPending = useCallback(async (rachaId: string, participantId: string) => {
@@ -357,6 +615,74 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [])
 
+  const createNextMonthRecurring = useCallback(
+    async (recurringGroupId: string): Promise<Racha | null> => {
+      const groupRachas = rachas.filter((r) => r.recurringGroupId === recurringGroupId)
+      if (groupRachas.length === 0) return null
+
+      // Sort by creation date descending to pick the latest instance as template
+      const template = [...groupRachas].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )[0]
+
+      // Determine next month name
+      const months = [
+        'Janeiro',
+        'Fevereiro',
+        'Março',
+        'Abril',
+        'Maio',
+        'Junho',
+        'Julho',
+        'Agosto',
+        'Setembro',
+        'Outubro',
+        'Novembro',
+        'Dezembro',
+      ]
+
+      const currentMonthIndex = new Date().getMonth()
+      const nextMonthIndex = (currentMonthIndex + 1) % 12
+      const nextMonthName = months[nextMonthIndex]
+      const year =
+        nextMonthIndex === 0 ? new Date().getFullYear() + 1 : new Date().getFullYear()
+      const referenceMonth = `${nextMonthName}/${year}`
+
+      const groupName =
+        template.recurringGroupName || template.name.replace(/ - \w+\/\d+$/, '')
+
+      const newRachaData: Omit<Racha, 'id' | 'createdAt' | 'history'> = {
+        name: `${groupName} - ${referenceMonth}`,
+        category: 'República',
+        totalAmount: template.totalAmount,
+        splitType: template.splitType,
+        isRecurring: true,
+        recurringGroupId,
+        recurringGroupName: groupName,
+        referenceMonth,
+        creatorNickname: template.creatorNickname || currentNickname || 'Você',
+        description: `Mensalidade recorrente de ${referenceMonth} da ${groupName}`,
+        participants: template.participants.map((p) => ({
+          id: generateId(),
+          name: p.name,
+          amount: p.amount,
+          paid: false,
+        })),
+      }
+
+      try {
+        const created = await createRachaRecord(newRachaData)
+        setRachas((prev) => [created, ...prev])
+        return created
+      } catch (err) {
+        console.warn('Erro ao criar próximo mês recorrente no PocketBase:', err)
+        const fallback = await createRacha(newRachaData)
+        return fallback
+      }
+    },
+    [rachas, currentNickname, createRacha],
+  )
+
   const resetDemoRacha = useCallback(() => {
     setRachas((prev) => {
       const filtered = prev.filter((r) => r.id !== 'demo' && !r.isDemo)
@@ -379,11 +705,18 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       markParticipantPending,
       addParticipantToRacha,
       removeParticipantFromRacha,
+      updateParticipant,
+      saveOrganizerChanges,
+      createNextMonthRecurring,
       resetDemoRacha,
       isNicknameModalOpen,
       setIsNicknameModalOpen,
       isWhySolanaModalOpen,
       setIsWhySolanaModalOpen,
+      notifications,
+      unreadNotificationsCount,
+      markNotificationsAsRead,
+      clearNotifications,
     }),
     [
       rachas,
@@ -399,11 +732,18 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       markParticipantPending,
       addParticipantToRacha,
       removeParticipantFromRacha,
+      updateParticipant,
+      saveOrganizerChanges,
+      createNextMonthRecurring,
       resetDemoRacha,
       isNicknameModalOpen,
       setIsNicknameModalOpen,
       isWhySolanaModalOpen,
       setIsWhySolanaModalOpen,
+      notifications,
+      unreadNotificationsCount,
+      markNotificationsAsRead,
+      clearNotifications,
     ],
   )
 

@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useRacha } from '@/context/RachaContext'
 import { WhySolanaModal } from '@/components/WhySolanaModal'
 import { NicknameModal } from '@/components/NicknameModal'
+import { NotificationCenter } from '@/components/NotificationCenter'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -89,6 +90,9 @@ export default function Layout() {
                 <HelpCircle className="w-3.5 h-3.5" />
                 Por que Solana?
               </button>
+
+              {/* Centro de Notificações */}
+              <NotificationCenter />
 
               {/* User Avatar Menu */}
               <DropdownMenu>

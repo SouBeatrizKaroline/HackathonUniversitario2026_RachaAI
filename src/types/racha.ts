@@ -30,6 +30,22 @@ export interface Racha {
   isDemo?: boolean
   description?: string
   shareCode?: string
+  creatorNickname?: string
+  isRecurring?: boolean
+  recurringGroupId?: string
+  recurringGroupName?: string
+  referenceMonth?: string
+}
+
+export interface PaymentNotification {
+  id: string
+  rachaId: string
+  rachaName: string
+  participantName: string
+  amount: number
+  timestamp: string
+  txHash?: string
+  read: boolean
 }
 
 export interface InterpretedRachaData {

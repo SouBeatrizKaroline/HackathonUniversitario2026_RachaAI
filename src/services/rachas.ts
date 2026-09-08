@@ -12,6 +12,11 @@ export interface RachaRecord {
   description?: string
   isDemo?: boolean
   solanaRecipient?: string
+  creatorNickname?: string
+  isRecurring?: boolean
+  recurringGroupId?: string
+  recurringGroupName?: string
+  referenceMonth?: string
   created: string
   updated: string
 }
@@ -55,6 +60,11 @@ export function mapToRacha(
     shareCode: rachaRec.shareCode,
     description: rachaRec.description,
     isDemo: Boolean(rachaRec.isDemo),
+    creatorNickname: rachaRec.creatorNickname,
+    isRecurring: Boolean(rachaRec.isRecurring),
+    recurringGroupId: rachaRec.recurringGroupId,
+    recurringGroupName: rachaRec.recurringGroupName,
+    referenceMonth: rachaRec.referenceMonth,
     createdAt: rachaRec.created,
     participants: participants.map((p) => ({
       id: p.id,
@@ -163,6 +173,11 @@ export async function createRachaRecord(
     shareCode,
     description: data.description || '',
     isDemo: false,
+    creatorNickname: data.creatorNickname || '',
+    isRecurring: Boolean(data.isRecurring),
+    recurringGroupId: data.recurringGroupId || '',
+    recurringGroupName: data.recurringGroupName || '',
+    referenceMonth: data.referenceMonth || '',
   })
 
   // Create participants records
@@ -268,4 +283,20 @@ export async function addParticipantRecord(
 // Remove participant
 export async function removeParticipantRecord(participantId: string): Promise<void> {
   await pb.collection('participantes').delete(participantId)
+}
+
+// Update participant amount or name
+export async function updateParticipantRecord(
+  participantId: string,
+  data: Partial<Pick<ParticipantRecord, 'name' | 'amount' | 'paid'>>,
+): Promise<void> {
+  await pb.collection('participantes').update(participantId, data)
+}
+
+// Update racha metadata (name, totalAmount, splitType, description, etc.)
+export async function updateRachaRecord(
+  rachaId: string,
+  updates: Partial<RachaRecord>,
+): Promise<RachaRecord> {
+  return await pb.collection('rachas').update<RachaRecord>(rachaId, updates)
 }

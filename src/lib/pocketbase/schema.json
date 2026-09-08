@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-08T00:07:25.651Z",
+  "generatedAt": "2026-09-08T00:15:22.220Z",
   "collections": [
     {
       "name": "users",
@@ -29,14 +29,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -66,7 +71,14 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["República", "Comida", "Viagem", "Faculdade", "Evento", "Outro"]
+          "selectValues": [
+            "República",
+            "Comida",
+            "Viagem",
+            "Faculdade",
+            "Evento",
+            "Outro"
+          ]
         },
         {
           "name": "totalAmount",
@@ -79,7 +91,10 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["equal", "custom"]
+          "selectValues": [
+            "equal",
+            "custom"
+          ]
         },
         {
           "name": "shareCode",
@@ -110,19 +125,56 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "isRecurring",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "recurringGroupId",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "recurringGroupName",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "referenceMonth",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "creatorNickname",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
         "CREATE INDEX idx_rachas_shareCode ON rachas (shareCode)",
-        "CREATE INDEX idx_rachas_created ON rachas (created DESC)"
+        "CREATE INDEX idx_rachas_created ON rachas (created DESC)",
+        "CREATE INDEX `idx_rachas_recurring` ON `rachas` (recurringGroupId)",
+        "CREATE INDEX `idx_rachas_month` ON `rachas` (referenceMonth)"
       ]
     },
     {
@@ -178,17 +230,24 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
-      "indexes": ["CREATE INDEX idx_participantes_racha ON participantes (racha)"]
+      "indexes": [
+        "CREATE INDEX idx_participantes_racha ON participantes (racha)"
+      ]
     },
     {
       "name": "pagamentos",
@@ -225,7 +284,10 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["Confirmado", "Pendente"]
+          "selectValues": [
+            "Confirmado",
+            "Pendente"
+          ]
         },
         {
           "name": "txHash",
@@ -244,14 +306,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
