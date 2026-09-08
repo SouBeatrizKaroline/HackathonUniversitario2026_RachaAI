@@ -23,12 +23,15 @@ import {
   CarteiraMovimento,
   FinancialSummaryAggregated,
   CarteiraNotifPreferences,
+  DEFAULT_CARTEIRA_NOTIF_PREFS,
 } from '@/types/racha'
 import {
   fetchAllCarteiras,
   addCarteiraContribution,
   createCarteiraProposal,
   approveCarteiraProposal,
+  updateCarteiraThreshold,
+  updateCarteiraMemberPreferences,
   DEMO_CARTEIRA,
   CarteiraPropostaRecord,
   CarteiraMovimentoRecord,
@@ -365,54 +368,76 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             (currentLocalNickname &&
               prop.proposerName?.trim().toLowerCase() === currentLocalNickname)
 
-          // Se eu não sou o proponente, recebo notificação
+          // Se eu não sou o proponente, verificar preferências de notificação do morador
           if (!isProposerMe) {
-            setNotifications((prev) => {
-              const notifId = `prop-created-${prop.id}`
-              if (prev.some((n) => n.id === notifId)) return prev
+            setCarteiras((currentCarteiras) => {
+              const targetCart = currentCarteiras.find((c) => c.id === prop.carteira)
+              const memberKey = currentUserAuthId || currentLocalNickname
+              const memberPrefs =
+                (memberKey && targetCart?.notifPreferences?.[memberKey]) ||
+                DEFAULT_CARTEIRA_NOTIF_PREFS
 
-              return [
-                {
-                  id: notifId,
-                  type: 'carteira_proposta_criada',
-                  carteiraId: prop.carteira,
-                  carteiraName: 'Caixa da República',
-                  proposalId: prop.id,
-                  title: 'Nova proposta no caixa da república',
-                  description: prop.title,
-                  actorName: prop.proposerName,
-                  amount: prop.amount,
-                  timestamp: 'Agora há pouco',
-                  read: false,
-                  link: '/carteira',
-                },
-                ...prev,
-              ]
+              if (memberPrefs.novaProposta !== false) {
+                setNotifications((prev) => {
+                  const notifId = `prop-created-${prop.id}`
+                  if (prev.some((n) => n.id === notifId)) return prev
+
+                  return [
+                    {
+                      id: notifId,
+                      type: 'carteira_proposta_criada',
+                      carteiraId: prop.carteira,
+                      carteiraName: targetCart?.name || 'Caixa da República',
+                      proposalId: prop.id,
+                      title: 'Nova proposta no caixa da república',
+                      description: prop.title,
+                      actorName: prop.proposerName,
+                      amount: prop.amount,
+                      timestamp: 'Agora há pouco',
+                      read: false,
+                      link: '/carteira',
+                    },
+                    ...prev,
+                  ]
+                })
+              }
+              return currentCarteiras
             })
           }
         } else if (e.action === 'update' && prop.status === 'aprovada') {
-          // Quando a proposta for aprovada (atingiu quórum), notificar todos os moradores
-          setNotifications((prev) => {
-            const notifId = `prop-approved-${prop.id}`
-            if (prev.some((n) => n.id === notifId)) return prev
+          // Quando a proposta for aprovada (atingiu quórum), verificar preferências
+          setCarteiras((currentCarteiras) => {
+            const targetCart = currentCarteiras.find((c) => c.id === prop.carteira)
+            const memberKey = currentUserAuthId || currentLocalNickname
+            const memberPrefs =
+              (memberKey && targetCart?.notifPreferences?.[memberKey]) ||
+              DEFAULT_CARTEIRA_NOTIF_PREFS
 
-            return [
-              {
-                id: notifId,
-                type: 'carteira_proposta_aprovada',
-                carteiraId: prop.carteira,
-                carteiraName: 'Caixa da República',
-                proposalId: prop.id,
-                title: 'Proposta aprovada ✅',
-                description: `${prop.title} — Débito efetuado no caixa`,
-                actorName: prop.proposerName,
-                amount: prop.amount,
-                timestamp: 'Agora há pouco',
-                read: false,
-                link: '/carteira',
-              },
-              ...prev,
-            ]
+            if (memberPrefs.propostaAprovada !== false) {
+              setNotifications((prev) => {
+                const notifId = `prop-approved-${prop.id}`
+                if (prev.some((n) => n.id === notifId)) return prev
+
+                return [
+                  {
+                    id: notifId,
+                    type: 'carteira_proposta_aprovada',
+                    carteiraId: prop.carteira,
+                    carteiraName: targetCart?.name || 'Caixa da República',
+                    proposalId: prop.id,
+                    title: 'Proposta aprovada ✅',
+                    description: `${prop.title} — Débito efetuado no caixa`,
+                    actorName: prop.proposerName,
+                    amount: prop.amount,
+                    timestamp: 'Agora há pouco',
+                    read: false,
+                    link: '/carteira',
+                  },
+                  ...prev,
+                ]
+              })
+            }
+            return currentCarteiras
           })
         }
       })
@@ -437,28 +462,39 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             (currentUserAuthId && mov.user === currentUserAuthId) ||
             (currentLocalNickname && mov.authorName?.trim().toLowerCase() === currentLocalNickname)
 
-          // Notificar membros quando há um novo depósito (se não foi o próprio usuário que acabou de fazer localmente)
+          // Notificar membros quando há um novo depósito, respeitando preferências
           if (!isAuthorMe) {
-            setNotifications((prev) => {
-              const notifId = `mov-deposito-${mov.id}`
-              if (prev.some((n) => n.id === notifId)) return prev
+            setCarteiras((currentCarteiras) => {
+              const targetCart = currentCarteiras.find((c) => c.id === mov.carteira)
+              const memberKey = currentUserAuthId || currentLocalNickname
+              const memberPrefs =
+                (memberKey && targetCart?.notifPreferences?.[memberKey]) ||
+                DEFAULT_CARTEIRA_NOTIF_PREFS
 
-              return [
-                {
-                  id: notifId,
-                  type: 'carteira_contribuicao',
-                  carteiraId: mov.carteira,
-                  carteiraName: 'Caixa da República',
-                  title: 'Novo depósito no caixa coletivo',
-                  description: mov.description || 'Contribuição ao fundo de reserva',
-                  actorName: mov.authorName,
-                  amount: mov.amount,
-                  timestamp: 'Agora há pouco',
-                  read: false,
-                  link: '/carteira',
-                },
-                ...prev,
-              ]
+              if (memberPrefs.contribuicoes !== false) {
+                setNotifications((prev) => {
+                  const notifId = `mov-deposito-${mov.id}`
+                  if (prev.some((n) => n.id === notifId)) return prev
+
+                  return [
+                    {
+                      id: notifId,
+                      type: 'carteira_contribuicao',
+                      carteiraId: mov.carteira,
+                      carteiraName: targetCart?.name || 'Caixa da República',
+                      title: 'Novo depósito no caixa coletivo',
+                      description: mov.description || 'Contribuição ao fundo de reserva',
+                      actorName: mov.authorName,
+                      amount: mov.amount,
+                      timestamp: 'Agora há pouco',
+                      read: false,
+                      link: '/carteira',
+                    },
+                    ...prev,
+                  ]
+                })
+              }
+              return currentCarteiras
             })
           }
         }
@@ -1111,18 +1147,22 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }),
       )
 
-      // Notificação in-app informativa sobre o novo depósito para manter o grupo atualizado
-      addAppNotification({
-        type: 'carteira_contribuicao',
-        carteiraId: targetId,
-        carteiraName: target?.name || 'Caixa da República',
-        title: 'Depósito registrado no caixa',
-        description: `${description || 'Contribuição ao caixa'} por ${author}`,
-        actorName: author,
-        amount,
-        newBalance: newBal,
-        link: '/carteira',
-      })
+      // Notificação in-app informativa sobre o novo depósito, respeitando preferências do morador
+      const currentMemberKey = userId || author
+      const prefs = target?.notifPreferences?.[currentMemberKey] || DEFAULT_CARTEIRA_NOTIF_PREFS
+      if (prefs.contribuicoes !== false) {
+        addAppNotification({
+          type: 'carteira_contribuicao',
+          carteiraId: targetId,
+          carteiraName: target?.name || 'Caixa da República',
+          title: 'Depósito registrado no caixa',
+          description: `${description || 'Contribuição ao caixa'} por ${author}`,
+          actorName: author,
+          amount,
+          newBalance: newBal,
+          link: '/carteira',
+        })
+      }
 
       // PocketBase persist
       try {
@@ -1186,17 +1226,21 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         currentActiveName && author.toLowerCase() !== currentActiveName.toLowerCase()
 
       if (isOtherProposer) {
-        addAppNotification({
-          type: 'carteira_proposta_criada',
-          carteiraId: targetId,
-          carteiraName: target?.name || 'Caixa da República',
-          proposalId: tempProp.id,
-          title: 'Nova proposta no caixa da república',
-          description: title.trim(),
-          actorName: author,
-          amount,
-          link: '/carteira',
-        })
+        const memberKey = user?.id || currentActiveName
+        const memberPrefs = target?.notifPreferences?.[memberKey] || DEFAULT_CARTEIRA_NOTIF_PREFS
+        if (memberPrefs.novaProposta !== false) {
+          addAppNotification({
+            type: 'carteira_proposta_criada',
+            carteiraId: targetId,
+            carteiraName: target?.name || 'Caixa da República',
+            proposalId: tempProp.id,
+            title: 'Nova proposta no caixa da república',
+            description: title.trim(),
+            actorName: author,
+            amount,
+            link: '/carteira',
+          })
+        }
       }
 
       try {
@@ -1306,20 +1350,25 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }),
       )
 
-      // Se a proposta foi aprovada (atingiu quórum), disparar notificação local imediatamente
+      // Se a proposta foi aprovada (atingiu quórum), disparar notificação local respeitando preferências
       if (willExecute) {
-        addAppNotification({
-          type: 'carteira_proposta_aprovada',
-          carteiraId: targetCarteira?.id || carteiraId,
-          carteiraName: targetCarteira?.name || 'Caixa da República',
-          proposalId: targetProposal.id,
-          title: 'Proposta aprovada ✅',
-          description: `${targetProposal.title} — Débito efetuado no caixa`,
-          actorName: author,
-          amount: targetProposal.amount,
-          newBalance: executedNewBalance >= 0 ? executedNewBalance : 0,
-          link: '/carteira',
-        })
+        const memberKey = userId || author
+        const memberPrefs =
+          targetCarteira?.notifPreferences?.[memberKey] || DEFAULT_CARTEIRA_NOTIF_PREFS
+        if (memberPrefs.propostaAprovada !== false) {
+          addAppNotification({
+            type: 'carteira_proposta_aprovada',
+            carteiraId: targetCarteira?.id || carteiraId,
+            carteiraName: targetCarteira?.name || 'Caixa da República',
+            proposalId: targetProposal.id,
+            title: 'Proposta aprovada ✅',
+            description: `${targetProposal.title} — Débito efetuado no caixa`,
+            actorName: author,
+            amount: targetProposal.amount,
+            newBalance: executedNewBalance >= 0 ? executedNewBalance : 0,
+            link: '/carteira',
+          })
+        }
       }
 
       // PocketBase persist

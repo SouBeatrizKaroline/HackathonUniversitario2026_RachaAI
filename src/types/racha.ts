@@ -139,6 +139,12 @@ export interface CarteiraNotifPreferences {
   contribuicoes: boolean // Notificar quando morador fizer depósito/contribuição
 }
 
+export const DEFAULT_CARTEIRA_NOTIF_PREFS: CarteiraNotifPreferences = {
+  novaProposta: true,
+  propostaAprovada: true,
+  contribuicoes: true,
+}
+
 export interface CarteiraCompartilhada {
   id: string
   name: string

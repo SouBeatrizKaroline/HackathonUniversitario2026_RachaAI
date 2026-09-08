@@ -5,6 +5,7 @@ import {
   CarteiraMovimento,
   CarteiraProposta,
   CarteiraAprovacao,
+  CarteiraNotifPreferences,
   generateId,
 } from '@/types/racha'
 
@@ -19,6 +20,7 @@ export interface CarteiraRecord {
   owner?: string
   created: string
   updated: string
+  notif_preferences?: Record<string, any>
 }
 
 export interface CarteiraMembroRecord {
@@ -232,6 +234,7 @@ export function mapToCarteira(
     members: mappedMembers,
     movements: mappedMovements,
     proposals: mappedProposals,
+    notifPreferences: cRec.notif_preferences || undefined,
   }
 }
 
@@ -448,4 +451,31 @@ export async function approveCarteiraProposal(
 
     return { proposal: updatedProp, executed: false }
   }
+}
+
+// Update quorum threshold (minimum 1, max members length)
+export async function updateCarteiraThreshold(
+  carteiraId: string,
+  newThreshold: number,
+): Promise<void> {
+  await pb.collection('carteiras').update(carteiraId, {
+    threshold: newThreshold,
+  })
+}
+
+// Update notification preferences for a member in carteiras collection
+export async function updateCarteiraMemberPreferences(
+  carteiraId: string,
+  memberKey: string,
+  preferences: CarteiraNotifPreferences,
+): Promise<void> {
+  const currentCarteira = await pb.collection('carteiras').getOne<CarteiraRecord>(carteiraId)
+  const currentPrefs = currentCarteira.notif_preferences || {}
+  const updatedPrefs = {
+    ...currentPrefs,
+    [memberKey]: preferences,
+  }
+  await pb.collection('carteiras').update(carteiraId, {
+    notif_preferences: updatedPrefs,
+  })
 }

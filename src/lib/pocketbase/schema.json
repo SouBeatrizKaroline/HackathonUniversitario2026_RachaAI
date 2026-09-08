@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-08T00:43:23.985Z",
+  "generatedAt": "2026-09-08T01:02:09.407Z",
   "collections": [
     {
       "name": "users",
@@ -453,6 +453,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "notif_preferences",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
