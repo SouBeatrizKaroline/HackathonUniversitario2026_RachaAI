@@ -348,18 +348,33 @@ export default function RachaDetailPage() {
             <span className="hidden sm:inline">Exportar</span>
           </Button>
 
-          {/* Resumo do mês (se for república recorrente) */}
+          {/* Resumo do mês e Carteira da República (se for república recorrente) */}
           {racha.isRecurring && (
-            <Button
-              onClick={handleOpenMonthlySummary}
-              variant="outline"
-              size="sm"
-              className="rounded-xl border-purple-200 text-[#7B2FF7] bg-purple-50/50 hover:bg-purple-100/70 text-xs font-semibold gap-1.5 h-9"
-              title="Resumo mensal da república gerado por Gemini"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span className="hidden sm:inline">Resumo do mês</span>
-            </Button>
+            <>
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="rounded-xl border-emerald-300 text-emerald-800 bg-emerald-50/50 hover:bg-emerald-100 text-xs font-semibold gap-1.5 h-9 hidden md:inline-flex"
+                title="Abrir carteira compartilhada da república"
+              >
+                <Link to="/carteira">
+                  <span className="text-emerald-600">🏠</span>
+                  <span>Carteira da casa</span>
+                </Link>
+              </Button>
+
+              <Button
+                onClick={handleOpenMonthlySummary}
+                variant="outline"
+                size="sm"
+                className="rounded-xl border-purple-200 text-[#7B2FF7] bg-purple-50/50 hover:bg-purple-100/70 text-xs font-semibold gap-1.5 h-9"
+                title="Resumo mensal da república gerado por Gemini"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span className="hidden sm:inline">Resumo do mês</span>
+              </Button>
+            </>
           )}
 
           {/* Organizer panel button */}

@@ -25,6 +25,8 @@ import {
   LogIn,
   UserPlus,
   Shield,
+  BarChart3,
+  Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -64,6 +66,8 @@ export default function Layout() {
     if (path === '/assistente') return 'Assistente IA'
     if (path === '/racha/novo') return 'Criar Racha'
     if (path === '/rachas') return 'Meus Rachas'
+    if (path === '/historico') return 'Histórico Financeiro'
+    if (path === '/carteira') return 'Carteira da República'
     if (path.startsWith('/racha/')) return 'Detalhes do Racha'
     return 'Racha.AI'
   }
@@ -73,6 +77,8 @@ export default function Layout() {
   const isAssistantActive =
     location.pathname === '/assistente' || location.pathname === '/racha/novo'
   const isRachasActive = location.pathname === '/rachas'
+  const isHistoricoActive = location.pathname === '/historico'
+  const isCarteiraActive = location.pathname === '/carteira'
 
   const displayName = isAuthenticated
     ? user?.name || user?.email?.split('@')[0] || 'Usuário'
@@ -124,13 +130,59 @@ export default function Layout() {
               {getPageTitle()}
             </div>
 
+            {/* Desktop Navigation Links */}
+            <div className="hidden md:flex items-center gap-1">
+              <Link
+                to="/dashboard"
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  isHomeActive
+                    ? 'text-[#7B2FF7] bg-purple-50'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-slate-50'
+                }`}
+              >
+                Início
+              </Link>
+              <Link
+                to="/rachas"
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  isRachasActive
+                    ? 'text-[#7B2FF7] bg-purple-50'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-slate-50'
+                }`}
+              >
+                Rachas
+              </Link>
+              <Link
+                to="/historico"
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 ${
+                  isHistoricoActive
+                    ? 'text-[#7B2FF7] bg-purple-50'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-slate-50'
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Histórico</span>
+              </Link>
+              <Link
+                to="/carteira"
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 ${
+                  isCarteiraActive
+                    ? 'text-[#7B2FF7] bg-purple-50'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-slate-50'
+                }`}
+              >
+                <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Carteira</span>
+              </Link>
+            </div>
+
             {/* Right actions */}
             <div className="flex items-center gap-2 sm:gap-3">
               {/* Desktop link: Por que Solana */}
               <button
                 type="button"
                 onClick={() => setIsWhySolanaModalOpen(true)}
-                className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-[#7B2FF7] hover:bg-purple-50 transition-colors"
+                className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-muted-foreground hover:text-[#7B2FF7] hover:bg-purple-50 transition-colors"
               >
                 <HelpCircle className="w-3.5 h-3.5" />
                 Por que Solana?
@@ -204,6 +256,22 @@ export default function Layout() {
                   </DropdownMenuItem>
 
                   <DropdownMenuItem
+                    onClick={() => navigate('/historico')}
+                    className="text-xs font-medium cursor-pointer"
+                  >
+                    <BarChart3 className="w-4 h-4 mr-2 text-[#7B2FF7]" />
+                    Histórico financeiro
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={() => navigate('/carteira')}
+                    className="text-xs font-medium cursor-pointer"
+                  >
+                    <Wallet className="w-4 h-4 mr-2 text-emerald-600" />
+                    Carteira da república
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
                     onClick={() => setIsWhySolanaModalOpen(true)}
                     className="text-xs font-medium cursor-pointer"
                   >
@@ -266,39 +334,61 @@ export default function Layout() {
 
       {/* Bottom Nav Bar (Mobile only, authenticated pages) */}
       {!isLandingPage && (
-        <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-border px-6 py-2 shadow-lg">
-          <div className="flex items-center justify-between max-w-md mx-auto relative">
+        <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-border px-3 py-1.5 shadow-lg">
+          <div className="flex items-center justify-around max-w-md mx-auto relative">
             {/* Início */}
             <Link
               to="/dashboard"
-              className={`flex flex-col items-center justify-center py-1 transition-colors ${
+              className={`flex flex-col items-center justify-center py-1 px-2 transition-colors ${
                 isHomeActive ? 'text-[#7B2FF7] font-bold' : 'text-muted-foreground font-medium'
               }`}
             >
-              <Home className="w-5 h-5 mb-0.5" />
+              <Home className="w-4 h-4 mb-0.5" />
               <span className="text-[10px]">Início</span>
             </Link>
-
-            {/* Novo Racha (Center Elevated Floating Button) */}
-            <div className="relative -top-5">
-              <Link
-                to="/assistente"
-                className="w-13 h-13 w-12 h-12 rounded-full bg-gradient-to-tr from-[#7B2FF7] to-[#9D5BFF] text-white flex items-center justify-center shadow-lg shadow-purple-500/40 border-4 border-white hover:scale-105 active:scale-95 transition-all"
-                aria-label="Criar novo racha com IA"
-              >
-                <Plus className="w-6 h-6 stroke-[2.5]" />
-              </Link>
-            </div>
 
             {/* Rachas */}
             <Link
               to="/rachas"
-              className={`flex flex-col items-center justify-center py-1 transition-colors ${
+              className={`flex flex-col items-center justify-center py-1 px-2 transition-colors ${
                 isRachasActive ? 'text-[#7B2FF7] font-bold' : 'text-muted-foreground font-medium'
               }`}
             >
-              <ListOrdered className="w-5 h-5 mb-0.5" />
+              <ListOrdered className="w-4 h-4 mb-0.5" />
               <span className="text-[10px]">Rachas</span>
+            </Link>
+
+            {/* Novo Racha (Center Elevated Floating Button) */}
+            <div className="relative -top-4">
+              <Link
+                to="/assistente"
+                className="w-11 h-11 rounded-full bg-gradient-to-tr from-[#7B2FF7] to-[#9D5BFF] text-white flex items-center justify-center shadow-lg shadow-purple-500/40 border-2 border-white hover:scale-105 active:scale-95 transition-all"
+                aria-label="Criar novo racha com IA"
+              >
+                <Plus className="w-5 h-5 stroke-[2.5]" />
+              </Link>
+            </div>
+
+            {/* Histórico */}
+            <Link
+              to="/historico"
+              className={`flex flex-col items-center justify-center py-1 px-2 transition-colors ${
+                isHistoricoActive ? 'text-[#7B2FF7] font-bold' : 'text-muted-foreground font-medium'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 mb-0.5" />
+              <span className="text-[10px]">Histórico</span>
+            </Link>
+
+            {/* Carteira */}
+            <Link
+              to="/carteira"
+              className={`flex flex-col items-center justify-center py-1 px-2 transition-colors ${
+                isCarteiraActive ? 'text-[#7B2FF7] font-bold' : 'text-muted-foreground font-medium'
+              }`}
+            >
+              <Wallet className="w-4 h-4 mb-0.5" />
+              <span className="text-[10px]">Carteira</span>
             </Link>
           </div>
         </nav>

@@ -15,7 +15,21 @@ import {
   claimRachasForUser,
   PagamentoRecord,
 } from '@/services/rachas'
-import { PaymentNotification } from '@/types/racha'
+import {
+  PaymentNotification,
+  CarteiraCompartilhada,
+  CarteiraProposta,
+  CarteiraMovimento,
+  FinancialSummaryAggregated,
+} from '@/types/racha'
+import {
+  fetchAllCarteiras,
+  addCarteiraContribution,
+  createCarteiraProposal,
+  approveCarteiraProposal,
+  DEMO_CARTEIRA,
+} from '@/services/carteiras'
+import { computeFinancialSummary } from '@/services/financialHistory'
 import pb from '@/lib/pocketbase/client'
 
 interface RachaContextType {
@@ -67,6 +81,29 @@ interface RachaContextType {
   markNotificationsAsRead: () => void
   clearNotifications: () => void
   syncLocalStorageRachasToUser: (userId: string) => Promise<number>
+  // Carteira Coletiva (República)
+  carteiras: CarteiraCompartilhada[]
+  primaryCarteira: CarteiraCompartilhada | undefined
+  contributeToCarteira: (
+    carteiraId: string,
+    amount: number,
+    description: string,
+    authorName?: string,
+  ) => Promise<void>
+  proposeCarteiraExpense: (
+    carteiraId: string,
+    title: string,
+    amount: number,
+    recipient?: string,
+    proposerName?: string,
+  ) => Promise<void>
+  approveProposal: (
+    carteiraId: string,
+    proposalId: string,
+    approverName?: string,
+  ) => Promise<{ executed: boolean }>
+  // Histórico financeiro
+  financialSummary: FinancialSummaryAggregated
 }
 
 const STORAGE_KEY = 'rachaai_rachas'
@@ -78,6 +115,7 @@ const RachaContext = createContext<RachaContextType | undefined>(undefined)
 export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [rachas, setRachas] = useState<Racha[]>([DEMO_RACHA])
   const [isLoading, setIsLoading] = useState(true)
+  const [carteiras, setCarteiras] = useState<CarteiraCompartilhada[]>([DEMO_CARTEIRA])
 
   const [currentNickname, setCurrentNicknameState] = useState<string>(() => {
     try {
@@ -206,7 +244,20 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (mounted) setIsLoading(false)
     }
 
+    // Initial carteiras load
+    async function loadCarteiras() {
+      try {
+        const remoteCarteiras = await fetchAllCarteiras()
+        if (mounted && remoteCarteiras && remoteCarteiras.length > 0) {
+          setCarteiras(remoteCarteiras)
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar carteiras remotas:', err)
+      }
+    }
+
     loadInitial()
+    loadCarteiras()
     return () => {
       mounted = false
     }
@@ -835,6 +886,247 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     })
   }, [])
 
+  // CARTEIRA ACTIONS
+  const primaryCarteira = useMemo(() => {
+    return carteiras[0] || DEMO_CARTEIRA
+  }, [carteiras])
+
+  const contributeToCarteira = useCallback(
+    async (carteiraId: string, amount: number, description: string, authorName?: string) => {
+      const user = pb.authStore.record
+      const author = authorName?.trim() || user?.name || currentNickname || 'Visitante'
+      const userId = user?.id || undefined
+
+      // Optimistic update
+      setCarteiras((prev) =>
+        prev.map((c) => {
+          if (c.id !== carteiraId && !(carteiraId === 'demo' && c.isDemo)) return c
+          const newBal = c.balance + amount
+          const newMov: CarteiraMovimento = {
+            id: generateId(),
+            carteiraId: c.id,
+            type: 'deposito',
+            amount,
+            description: description || 'Contribuição ao caixa',
+            authorName: author,
+            timestamp: 'Agora há pouco',
+            user: userId,
+          }
+
+          // Update member if exists
+          const existingMemberIndex = c.members.findIndex(
+            (m) => m.name.toLowerCase() === author.toLowerCase(),
+          )
+          let updatedMembers = [...c.members]
+          if (existingMemberIndex >= 0) {
+            updatedMembers[existingMemberIndex] = {
+              ...updatedMembers[existingMemberIndex],
+              totalContributed: updatedMembers[existingMemberIndex].totalContributed + amount,
+              isVerified: Boolean(userId),
+            }
+          } else {
+            updatedMembers.push({
+              id: generateId(),
+              name: author,
+              role: 'membro',
+              totalContributed: amount,
+              user: userId,
+              isVerified: Boolean(userId),
+            })
+          }
+
+          return {
+            ...c,
+            balance: newBal,
+            members: updatedMembers,
+            movements: [newMov, ...c.movements],
+          }
+        }),
+      )
+
+      // PocketBase persist
+      try {
+        const target = carteiras.find(
+          (c) => c.id === carteiraId || (carteiraId === 'demo' && c.isDemo),
+        )
+        if (target && !target.id.startsWith('demo-')) {
+          await addCarteiraContribution(target.id, amount, author, description, userId)
+        }
+      } catch (err) {
+        console.warn('Erro ao registrar contribuição no PocketBase:', err)
+      }
+    },
+    [carteiras, currentNickname],
+  )
+
+  const proposeCarteiraExpense = useCallback(
+    async (
+      carteiraId: string,
+      title: string,
+      amount: number,
+      recipient?: string,
+      proposerName?: string,
+    ) => {
+      const user = pb.authStore.record
+      const author = proposerName?.trim() || user?.name || currentNickname || 'Morador'
+      const userId = user?.id || undefined
+
+      const target = carteiras.find(
+        (c) => c.id === carteiraId || (carteiraId === 'demo' && c.isDemo),
+      )
+      const targetId = target?.id || carteiraId
+
+      const tempProp: CarteiraProposta = {
+        id: generateId(),
+        carteiraId: targetId,
+        title: title.trim(),
+        amount,
+        recipient: recipient?.trim(),
+        proposerName: author,
+        proposerUser: userId,
+        status: 'pendente',
+        requiredApprovals: target?.threshold || 2,
+        currentApprovals: 0,
+        approvals: [],
+        createdAt: new Date().toISOString(),
+      }
+
+      setCarteiras((prev) =>
+        prev.map((c) => {
+          if (c.id !== targetId && !(targetId === 'demo' && c.isDemo)) return c
+          return {
+            ...c,
+            proposals: [tempProp, ...c.proposals],
+          }
+        }),
+      )
+
+      try {
+        if (target && !target.id.startsWith('demo-')) {
+          await createCarteiraProposal(target.id, title, amount, author, recipient, userId)
+        }
+      } catch (err) {
+        console.warn('Erro ao criar proposta no PocketBase:', err)
+      }
+    },
+    [carteiras, currentNickname],
+  )
+
+  const approveProposal = useCallback(
+    async (
+      carteiraId: string,
+      proposalId: string,
+      approverName?: string,
+    ): Promise<{ executed: boolean }> => {
+      const user = pb.authStore.record
+      const author = approverName?.trim() || user?.name || currentNickname || 'Membro'
+      const userId = user?.id || undefined
+
+      const targetCarteira = carteiras.find(
+        (c) => c.id === carteiraId || (carteiraId === 'demo' && c.isDemo),
+      )
+      const targetProposal = targetCarteira?.proposals.find((p) => p.id === proposalId)
+
+      if (!targetProposal) {
+        throw new Error('Proposta não encontrada.')
+      }
+
+      if (
+        author.toLowerCase() === targetProposal.proposerName.toLowerCase() ||
+        (userId && targetProposal.proposerUser && userId === targetProposal.proposerUser)
+      ) {
+        throw new Error('O proponente da saída não pode aprovar a própria proposta.')
+      }
+
+      if (
+        targetProposal.approvals.some(
+          (a) =>
+            a.approverName.toLowerCase() === author.toLowerCase() ||
+            (userId && a.approverUser && a.approverUser === userId),
+        )
+      ) {
+        throw new Error('Você já registrou aprovação para esta proposta.')
+      }
+
+      const nextApprovalsCount = targetProposal.currentApprovals + 1
+      const willExecute = nextApprovalsCount >= targetProposal.requiredApprovals
+
+      if (willExecute && (targetCarteira?.balance || 0) < targetProposal.amount) {
+        throw new Error('Saldo insuficiente na carteira compartilhada para liquidar esta despesa.')
+      }
+
+      // Optimistic state update
+      setCarteiras((prev) =>
+        prev.map((c) => {
+          if (c.id !== carteiraId && !(carteiraId === 'demo' && c.isDemo)) return c
+
+          let newBalance = c.balance
+          let newMovements = [...c.movements]
+
+          if (willExecute) {
+            newBalance = c.balance - targetProposal.amount
+            newMovements.unshift({
+              id: generateId(),
+              carteiraId: c.id,
+              type: 'saida',
+              amount: targetProposal.amount,
+              description: `[Aprovado em grupo] ${targetProposal.title}`,
+              authorName: targetProposal.proposerName,
+              recipient: targetProposal.recipient || 'Despesa coletiva',
+              timestamp: 'Agora há pouco',
+              user: targetProposal.proposerUser,
+            })
+          }
+
+          const updatedProposals = c.proposals.map((p) => {
+            if (p.id !== proposalId) return p
+            return {
+              ...p,
+              status: willExecute ? ('aprovada' as const) : ('pendente' as const),
+              currentApprovals: nextApprovalsCount,
+              approvals: [
+                ...p.approvals,
+                {
+                  id: generateId(),
+                  propostaId: p.id,
+                  approverName: author,
+                  approverUser: userId,
+                  timestamp: 'Agora há pouco',
+                },
+              ],
+            }
+          })
+
+          return {
+            ...c,
+            balance: newBalance,
+            movements: newMovements,
+            proposals: updatedProposals,
+          }
+        }),
+      )
+
+      // PocketBase persist
+      if (targetCarteira && !targetCarteira.id.startsWith('demo-')) {
+        try {
+          const res = await approveCarteiraProposal(proposalId, author, userId)
+          return { executed: res.executed }
+        } catch (err: any) {
+          console.warn('Erro ao sincronizar aprovação no PocketBase:', err)
+          throw err
+        }
+      }
+
+      return { executed: willExecute }
+    },
+    [carteiras, currentNickname],
+  )
+
+  // FINANCIAL SUMMARY
+  const financialSummary = useMemo(() => {
+    return computeFinancialSummary(rachas)
+  }, [rachas])
+
   const value = useMemo(
     () => ({
       rachas,
@@ -863,6 +1155,12 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       markNotificationsAsRead,
       clearNotifications,
       syncLocalStorageRachasToUser,
+      carteiras,
+      primaryCarteira,
+      contributeToCarteira,
+      proposeCarteiraExpense,
+      approveProposal,
+      financialSummary,
     }),
     [
       rachas,
@@ -891,6 +1189,12 @@ export const RachaProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       markNotificationsAsRead,
       clearNotifications,
       syncLocalStorageRachasToUser,
+      carteiras,
+      primaryCarteira,
+      contributeToCarteira,
+      proposeCarteiraExpense,
+      approveProposal,
+      financialSummary,
     ],
   )
 

@@ -21,6 +21,9 @@ import {
   UserCheck,
   UserPlus,
   ShieldAlert,
+  Wallet,
+  BarChart3,
+  Award,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { MonthEndReminderBanner } from '@/components/MonthEndReminderBanner'
@@ -55,7 +58,8 @@ const SUGGESTIONS = [
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user, isAuthenticated } = useAuth()
-  const { rachas, currentNickname, createNextMonthRecurring } = useRacha()
+  const { rachas, currentNickname, createNextMonthRecurring, financialSummary, primaryCarteira } =
+    useRacha()
   const [inputText, setInputText] = useState('')
   const [creatingGroupMonth, setCreatingGroupMonth] = useState<string | null>(null)
 
@@ -163,6 +167,59 @@ export default function Dashboard() {
         <p className="text-xs sm:text-sm text-muted-foreground">
           Descreva o que precisa dividir ou escolha uma sugestão rápida abaixo.
         </p>
+      </div>
+
+      {/* 1.5 NOVO CARD/BANNER: SEU HISTÓRICO DE RACHAS E CARTEIRA DA REPÚBLICA */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Banner Histórico Financeiro */}
+        <Link
+          to="/historico"
+          className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#7B2FF7] via-[#8F44FD] to-[#6A23E0] p-4 sm:p-5 text-white shadow-subtle hover:shadow-elevation transition-all"
+        >
+          <div className="absolute right-0 top-0 w-28 h-28 bg-white/10 rounded-full blur-xl pointer-events-none group-hover:scale-110 transition-transform" />
+          <div className="flex items-start justify-between gap-2 relative z-10">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-md text-amber-200 text-[10px] font-bold uppercase tracking-wider">
+                <Award className="w-3 h-3 text-amber-300" />
+                <span>Seu Histórico de Rachas</span>
+              </div>
+              <h3 className="text-base sm:text-lg font-black tracking-tight leading-snug">
+                Vocês já racharam {formatCurrencyBRL(financialSummary.totalSplit)} 🎉
+              </h3>
+              <p className="text-xs text-purple-100/90 line-clamp-1">
+                {financialSummary.paymentsCount} pagamentos quitados • Ver totais e gráficos
+              </p>
+            </div>
+            <span className="p-2 rounded-xl bg-white/20 text-white group-hover:translate-x-0.5 transition-transform shrink-0">
+              <ChevronRight className="w-4 h-4" />
+            </span>
+          </div>
+        </Link>
+
+        {/* Banner Carteira da República */}
+        <Link
+          to="/carteira"
+          className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#1E293B] p-4 sm:p-5 text-white shadow-subtle hover:shadow-elevation transition-all border border-slate-800"
+        >
+          <div className="absolute right-0 bottom-0 w-28 h-28 bg-emerald-500/10 rounded-full blur-xl pointer-events-none group-hover:scale-110 transition-transform" />
+          <div className="flex items-start justify-between gap-2 relative z-10">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold uppercase tracking-wider">
+                <Wallet className="w-3 h-3 text-emerald-400" />
+                <span>Caixa Coletivo da República</span>
+              </div>
+              <h3 className="text-base sm:text-lg font-black tracking-tight leading-snug tabular-nums">
+                Saldo: {formatCurrencyBRL(primaryCarteira?.balance || 0)}
+              </h3>
+              <p className="text-xs text-slate-300 line-clamp-1">
+                Multisig {primaryCarteira?.threshold || 2} aprovações • Contribuir ou propor saída
+              </p>
+            </div>
+            <span className="p-2 rounded-xl bg-slate-800 text-slate-200 group-hover:translate-x-0.5 transition-transform shrink-0">
+              <ChevronRight className="w-4 h-4" />
+            </span>
+          </div>
+        </Link>
       </div>
 
       {/* Demo notice for visitors */}
@@ -307,6 +364,19 @@ export default function Dashboard() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        asChild
+                        variant="outline"
+                        className="text-xs font-semibold rounded-xl h-8 px-2.5 border-emerald-300 hover:bg-emerald-50 text-emerald-800 bg-emerald-50/40 gap-1.5"
+                        title="Abrir Carteira da República"
+                      >
+                        <Link to="/carteira">
+                          <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Carteira da casa</span>
+                        </Link>
+                      </Button>
+
                       <Button
                         size="sm"
                         variant="outline"

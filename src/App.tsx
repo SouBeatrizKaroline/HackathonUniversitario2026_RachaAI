@@ -13,6 +13,8 @@ import AssistantPage from './pages/AssistantPage'
 import CreateRachaPage from './pages/CreateRachaPage'
 import RachaDetailPage from './pages/RachaDetailPage'
 import RachasListPage from './pages/RachasListPage'
+import HistoricoFinanceiroPage from './pages/HistoricoFinanceiroPage'
+import CarteiraPage from './pages/CarteiraPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
@@ -34,6 +36,8 @@ const App = () => (
               <Route path="/racha/:id" element={<RachaDetailPage />} />
               <Route path="/racha/demo" element={<RachaDetailPage />} />
               <Route path="/rachas" element={<RachasListPage />} />
+              <Route path="/historico" element={<HistoricoFinanceiroPage />} />
+              <Route path="/carteira" element={<CarteiraPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/cadastro" element={<RegisterPage />} />
               <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />

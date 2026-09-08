@@ -75,11 +75,22 @@ export default function RachasListPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            asChild
+            variant="outline"
+            className="text-xs border-purple-200 text-[#7B2FF7] hover:bg-purple-50 rounded-xl h-10 px-3 hidden md:inline-flex"
+          >
+            <Link to="/historico" className="flex items-center gap-1.5">
+              <TrendingUp className="w-4 h-4" />
+              <span>Histórico financeiro</span>
+            </Link>
+          </Button>
+
           {!isAuthenticated && (
             <Button
               asChild
               variant="outline"
-              className="text-xs border-purple-200 text-[#7B2FF7] hover:bg-purple-50 rounded-xl h-10 px-3"
+              className="text-xs border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-xl h-10 px-3"
             >
               <Link to="/cadastro" className="flex items-center gap-1.5">
                 <UserPlus className="w-4 h-4" />

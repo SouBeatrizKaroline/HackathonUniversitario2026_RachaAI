@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-08T00:32:02.585Z",
+  "generatedAt": "2026-09-08T00:38:14.241Z",
   "collections": [
     {
       "name": "users",
@@ -385,6 +385,356 @@
         "CREATE INDEX idx_convites_racha ON convites (racha)",
         "CREATE INDEX idx_convites_email ON convites (email)"
       ]
+    },
+    {
+      "name": "carteiras",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "@request.auth.id != '' && owner = @request.auth.id || owner = null || isDemo = true",
+        "delete": "@request.auth.id != '' && owner = @request.auth.id || owner = null"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "balance",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "threshold",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "isDemo",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "groupCode",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "owner",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_carteiras_groupCode ON carteiras (groupCode)",
+        "CREATE INDEX idx_carteiras_owner ON carteiras (owner)"
+      ]
+    },
+    {
+      "name": "carteira_membros",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "carteira",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "carteiras"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "role",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["admin", "membro"]
+        },
+        {
+          "name": "totalContributed",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "user",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_carteira_membros_carteira ON carteira_membros (carteira)",
+        "CREATE INDEX idx_carteira_membros_user ON carteira_membros (user)"
+      ]
+    },
+    {
+      "name": "carteira_movimentos",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "carteira",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "carteiras"
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["deposito", "saida"]
+        },
+        {
+          "name": "amount",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "authorName",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "recipient",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "user",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_carteira_movimentos_carteira ON carteira_movimentos (carteira)",
+        "CREATE INDEX idx_carteira_movimentos_created ON carteira_movimentos (created DESC)"
+      ]
+    },
+    {
+      "name": "carteira_propostas",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "carteira",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "carteiras"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "amount",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "recipient",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "proposerName",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "proposerUser",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["pendente", "aprovada", "rejeitada"]
+        },
+        {
+          "name": "requiredApprovals",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "currentApprovals",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_carteira_propostas_carteira ON carteira_propostas (carteira)",
+        "CREATE INDEX idx_carteira_propostas_status ON carteira_propostas (status)"
+      ]
+    },
+    {
+      "name": "carteira_aprovacoes",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "proposta",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "carteira_propostas"
+        },
+        {
+          "name": "approverName",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "approverUser",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_carteira_aprovacoes_proposta ON carteira_aprovacoes (proposta)"]
     }
   ]
 }
